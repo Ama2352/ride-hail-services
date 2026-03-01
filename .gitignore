@@ -1,0 +1,47 @@
+# =============================================================================
+# .gitignore — ride-hail-services (Repo 2)
+# =============================================================================
+
+# ---- Go build artifacts ----
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# ---- Go tooling ----
+vendor/
+coverage.out
+coverage.html
+*.prof
+
+# ---- Docker image tars (from `docker save` in CI) ----
+*.tar
+
+# ---- CI workspace scratch ----
+gitops-workspace/
+
+# ---- SonarQube working dir ----
+.scannerwork/
+
+# ---- Environment / secrets ----
+.env
+.env.*
+*.secret
+
+# ---- OS noise ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ---- IDE / editor ----
+.vscode/
+.idea/
+*.iml
+
+.notes/
