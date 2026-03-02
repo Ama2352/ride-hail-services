@@ -283,17 +283,17 @@ pipeline {
                         git clone --branch "${GITOPS_BRANCH}" --depth 1 "${GITOPS_URL}" gitops-workspace
                         cd gitops-workspace
 
-                        echo "=== Updating image tags for dispatch-service ==="
-                        find . -name '*.yaml' -exec grep -l 'dispatch-service' {} \\; | while read file; do
-                            sed -i "s|image:.*dispatch-service:.*|image: ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}|g" "$file"
-                            echo "    Updated: $file"
-                        done
+                        # Update the Kustomize overlay newTag — this is the ONLY line ArgoCD needs.
+                        # The base k8s.yaml image name stays constant; only the tag changes.
+                        echo "=== Updating dispatch dev overlay image tag ==="
+                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" \
+                            apps/dispatch/overlays/dev/kustomization.yaml
+                        echo "    apps/dispatch/overlays/dev/kustomization.yaml → newTag: ${IMAGE_TAG}"
 
-                        echo "=== Updating image tags for notification-service ==="
-                        find . -name '*.yaml' -exec grep -l 'notification-service' {} \\; | while read file; do
-                            sed -i "s|image:.*notification-service:.*|image: ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}|g" "$file"
-                            echo "    Updated: $file"
-                        done
+                        echo "=== Updating notification dev overlay image tag ==="
+                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" \
+                            apps/notification/overlays/dev/kustomization.yaml
+                        echo "    apps/notification/overlays/dev/kustomization.yaml → newTag: ${IMAGE_TAG}"
 
                         echo "=== Committing and pushing to GitOps repo ==="
                         git config user.email "jenkins@ride-hail.ci"
