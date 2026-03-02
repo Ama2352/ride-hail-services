@@ -54,8 +54,11 @@ ride-hail-services/
 │   ├── go.mod / go.sum
 │   ├── Dockerfile
 │   └── sonar-project.properties
+├── jenkins/
+│   └── email/
+│       ├── success.txt
+│       └── failure.txt
 ├── Jenkinsfile
-├── MIGRATION_NOTES.md
 ├── .gitignore
 └── README.md
 ```
@@ -82,7 +85,7 @@ The `Jenkinsfile` defines a CI-only pipeline. Jenkins runs on the `jenkins-vm` (
 
 ### What the pipeline does NOT do
 
-- **No `kubectl` commands** — forbidden by Global Principle #3 (Pull-Based CD).
+- **No `kubectl` commands** — deployment is pull-based (Global Principle #3).
 - **No cluster access** — the pipeline never touches the Kubernetes API.
 - Deployment is handled entirely by ArgoCD watching Repo 3.
 
@@ -113,10 +116,3 @@ go run .
 cd dispatch && go test -v ./...
 cd ../notification && go test -v ./...
 ```
-
----
-
-## Migration History
-
-See [MIGRATION_NOTES.md](MIGRATION_NOTES.md) for the full decision log of what was extracted
-from the monolithic `UITGo_Ver2` repository and why.

@@ -1,25 +1,13 @@
 // =============================================================================
-// Jenkinsfile — ride-hail-services (Repo 2)
+// Jenkinsfile — ride-hail-services
 //
-// CI-ONLY pipeline. Builds, tests, scans, and pushes Docker images.
-// The final stage ("GitOps Update") commits the new image tag to Repo 3
-// (ride-hail-gitops), triggering ArgoCD to reconcile the cluster.
+// CI pipeline: test → scan → build → push → GitOps update.
+// Never touches the cluster directly. Deployment is pull-based via ArgoCD.
 //
-// WHAT WAS REMOVED (compared to UITGo_Ver2/Jenkinsfile):
-//   - 'CD' stage:  kubectl apply, envsubst, rollout status — all forbidden
-//                   by Global Principle #3 (Pull-Based CD).
-//   - KUBERNETES_SERVER env var — this pipeline never talks to the cluster.
-//   - cd-pod.yaml K8s agent — no need for in-cluster kubectl access.
-//   - Email templates from infrastructure/ — those paths belonged to Repo 1.
-//
-// WHAT WAS ADDED:
-//   - 'GitOps Update' stage: clones Repo 3, updates image tags via sed,
-//     commits + pushes. ArgoCD detects the change and deploys.
-//
-// CREDENTIALS REQUIRED IN JENKINS:
+// Credentials required in Jenkins:
 //   - docker-registry-credentials  (usernamePassword)  — Docker Hub push
 //   - sonarqube-token              (string)             — SonarQube analysis
-//   - gitops-repo-credentials      (usernamePassword)   — Push to Repo 3
+//   - gitops-repo-credentials      (usernamePassword)   — push image tag to ride-hail-gitops
 // =============================================================================
 
 pipeline {
@@ -40,10 +28,7 @@ pipeline {
 
     stages {
 
-        // =====================================================================
-        // CI STAGES — unchanged from original (paths adjusted for new repo layout)
-        // =====================================================================
-
+        // CI stages run inside Docker sibling containers on the Jenkins host.
         stage('CI') {
             agent { label 'built-in' }
 
@@ -256,17 +241,11 @@ pipeline {
             }
         }
 
-        // =====================================================================
-        // GITOPS UPDATE — replaces the old "CD" stage entirely
-        //
-        // Instead of: kubectl apply -f k8s.yaml (Push-based CD, FORBIDDEN)
-        // We now:     git commit the new image tag into Repo 3 (Pull-based CD)
-        //
-        // ArgoCD watches Repo 3 and reconciles the cluster automatically.
-        // This pipeline NEVER touches the cluster directly.
-        // =====================================================================
-
+        // Updates the dev overlay image tag in ride-hail-gitops.
+        // ArgoCD detects the commit and reconciles the cluster.
+        // Only runs on the main branch — not on PRs or feature branches.
         stage('GitOps Update') {
+            when { branch 'main' }
             agent { label 'built-in' }
 
             steps {
