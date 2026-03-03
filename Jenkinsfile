@@ -42,8 +42,11 @@ pipeline {
                         echo "Checking out source code from SCM..."
                         checkout scm
                         script {
-                            env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT?.take(7) ?: 'latest'}"
-                            echo "Image tag: ${env.IMAGE_TAG}"
+                            // Capture short hash here — GIT_COMMIT is only available after
+                            // checkout scm. BRANCH_NAME is set by Multibranch Pipeline.
+                            env.GIT_SHORT = env.GIT_COMMIT?.take(7) ?: 'unknown'
+                            env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_SHORT}"
+                            echo "Branch: ${env.BRANCH_NAME} | Commit: ${env.GIT_SHORT} | Tag: ${env.IMAGE_TAG}"
                         }
                     }
                 }
@@ -78,8 +81,8 @@ pipeline {
                                         color: 'danger',
                                         message: ":x: *Unit Test Failed — dispatch*\n" +
                                             "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                            "Branch: ${env.GIT_BRANCH}\n" +
-                                            "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                            "Branch: ${env.BRANCH_NAME}\n" +
+                                            "Commit: `${env.GIT_SHORT}`\n" +
                                             ">`go vet` or `go test` failed for the dispatch service.\n" +
                                             "><${env.BUILD_URL}console|View Console Output>"
                                     )
@@ -114,8 +117,8 @@ pipeline {
                                         color: 'danger',
                                         message: ":x: *Unit Test Failed — notification*\n" +
                                             "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                            "Branch: ${env.GIT_BRANCH}\n" +
-                                            "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                            "Branch: ${env.BRANCH_NAME}\n" +
+                                            "Commit: `${env.GIT_SHORT}`\n" +
                                             ">`go vet` or `go test` failed for the notification service.\n" +
                                             "><${env.BUILD_URL}console|View Console Output>"
                                     )
@@ -132,6 +135,11 @@ pipeline {
                                 }
                             }
                             steps {
+                                // -------------------------------------------------------
+                                // TEST HOOK: Uncomment the line below to force a failure
+                                // and verify Slack failure notifications. Revert before merge.
+                                // -------------------------------------------------------
+                                // error('TEST: Deliberate failure — verify Slack notification')
                                 sh '''
                                     echo "=== Installing govulncheck ==="
                                     go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -149,8 +157,8 @@ pipeline {
                                         color: 'danger',
                                         message: ":warning: *Dependency Vulnerability Detected*\n" +
                                             "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                            "Branch: ${env.GIT_BRANCH}\n" +
-                                            "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                            "Branch: ${env.BRANCH_NAME}\n" +
+                                            "Commit: `${env.GIT_SHORT}`\n" +
                                             ">`govulncheck` found known vulnerabilities in Go dependencies.\n" +
                                             "><${env.BUILD_URL}console|View Console Output>"
                                     )
@@ -189,8 +197,8 @@ pipeline {
                                 color: 'danger',
                                 message: ":warning: *SonarQube Quality Gate Failed*\n" +
                                     "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                    "Branch: ${env.GIT_BRANCH}\n" +
-                                    "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                    "Branch: ${env.BRANCH_NAME}\n" +
+                                    "Commit: `${env.GIT_SHORT}`\n" +
                                     ">Static analysis did not pass the quality gate.\n" +
                                     ">SonarQube: ${SONAR_HOST}\n" +
                                     "><${env.BUILD_URL}console|View Console Output>"
@@ -254,8 +262,8 @@ pipeline {
                                 color: 'danger',
                                 message: ":rotating_light: *Container Image CVE Gate Failed*\n" +
                                     "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                    "Branch: ${env.GIT_BRANCH}\n" +
-                                    "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                    "Branch: ${env.BRANCH_NAME}\n" +
+                                    "Commit: `${env.GIT_SHORT}`\n" +
                                     ">Trivy detected HIGH or CRITICAL vulnerabilities.\n" +
                                     ">Images were *not* pushed to the registry.\n" +
                                     "><${env.BUILD_URL}console|View Console Output>"
@@ -373,8 +381,8 @@ pipeline {
                     color: 'good',
                     message: ":white_check_mark: *CI Pipeline Success — ride-hail-services*\n" +
                         "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                        "Branch: ${env.GIT_BRANCH}\n" +
-                        "Commit: `${env.GIT_COMMIT?.take(7) ?: 'N/A'}` | " +
+                        "Branch: ${env.BRANCH_NAME}\n" +
+                        "Commit: `${env.GIT_SHORT}` | " +
                         "Tag: `${env.IMAGE_TAG}`\n" +
                         "Duration: ${currentBuild.durationString}\n\n" +
                         "*Security Gates:*\n" +
@@ -395,8 +403,8 @@ pipeline {
                     color: 'danger',
                     message: ":x: *CI Pipeline Failed — ride-hail-services*\n" +
                         "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                        "Branch: ${env.GIT_BRANCH}\n" +
-                        "Commit: `${env.GIT_COMMIT?.take(7) ?: 'N/A'}`\n" +
+                        "Branch: ${env.BRANCH_NAME}\n" +
+                        "Commit: `${env.GIT_SHORT ?: 'unknown'}`\n" +
                         "Duration: ${currentBuild.durationString}\n" +
                         "Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}\n\n" +
                         "><${env.BUILD_URL}console|View Console Output>"
