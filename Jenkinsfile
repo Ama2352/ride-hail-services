@@ -139,7 +139,7 @@ pipeline {
                                 // TEST HOOK: Uncomment the line below to force a failure
                                 // and verify Slack failure notifications. Revert before merge.
                                 // -------------------------------------------------------
-                                error('TEST: Deliberate failure — verify Slack notification')
+                                // error('TEST: Deliberate failure — verify Slack notification')
                                 sh '''
                                     echo "=== Installing govulncheck ==="
                                     go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -179,6 +179,11 @@ pipeline {
                     }
                     steps {
                         withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                            // -------------------------------------------------------
+                            // TEST HOOK: Uncomment to force a SonarQube failure.
+                            // Revert before merge.
+                            // -------------------------------------------------------
+                            error('TEST: Deliberate SonarQube failure — verify Slack notification')
                             sh '''
                                 echo "=== [dispatch] Running SonarQube analysis ==="
                                 cd dispatch
@@ -241,6 +246,11 @@ pipeline {
                         }
                     }
                     steps {
+                        // -------------------------------------------------------
+                        // TEST HOOK: Uncomment to force a Trivy CVE gate failure.
+                        // Revert before merge.
+                        // -------------------------------------------------------
+                        // error('TEST: Deliberate Trivy failure — verify Slack notification')
                         sh '''
                             set -e
                             SCAN_FAILED=0
