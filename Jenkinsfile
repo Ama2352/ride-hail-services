@@ -128,17 +128,19 @@ pipeline {
                         }
                     }
                     steps {
-                        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                            sh '''
-                                echo "=== [dispatch] Running SonarQube analysis ==="
-                                cd dispatch
-                                sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
-                                echo "=== [dispatch] SonarQube analysis submitted ==="
-                                echo "=== [notification] Running SonarQube analysis ==="
-                                cd ../notification
-                                sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
-                                echo "=== [notification] SonarQube analysis submitted ==="
-                            '''
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                                sh '''
+                                    echo "=== [dispatch] Running SonarQube analysis ==="
+                                    cd dispatch
+                                    sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
+                                    echo "=== [dispatch] SonarQube analysis submitted ==="
+                                    echo "=== [notification] Running SonarQube analysis ==="
+                                    cd ../notification
+                                    sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
+                                    echo "=== [notification] SonarQube analysis submitted ==="
+                                '''
+                            }
                         }
                     }
                 }
