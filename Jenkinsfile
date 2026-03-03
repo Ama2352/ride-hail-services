@@ -139,7 +139,7 @@ pipeline {
                                 // TEST HOOK: Uncomment the line below to force a failure
                                 // and verify Slack failure notifications. Revert before merge.
                                 // -------------------------------------------------------
-                                // error('TEST: Deliberate failure — verify Slack notification')
+                                error('TEST: Deliberate failure — verify Slack notification')
                                 sh '''
                                     echo "=== Installing govulncheck ==="
                                     go install golang.org/x/vuln/cmd/govulncheck@latest
