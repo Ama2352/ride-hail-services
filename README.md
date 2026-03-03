@@ -13,7 +13,7 @@
 │      (Repo 1)       │     │  >>>  THIS REPO <<<  │     │      (Repo 3)       │
 │                     │     │                      │     │                     │
 │  Vagrant, Ansible,  │     │  Go source code,     │     │  K8s manifests,     │
-│  K8s bootstrap,     │     │  Dockerfiles,        │     │  Istio configs,     │
+│  K8s bootstrap,     │     │  Dockerfiles,        │     │  Helm values,       │
 │  ArgoCD install     │     │  Jenkinsfile (CI)    │     │  ArgoCD App defs    │
 └─────────────────────┘     └──────────┬───────────┘     └──────────▲──────────┘
                                        │  git commit image tag      │
@@ -36,7 +36,7 @@ Both services expose `/metrics` for Prometheus scraping and `/health` for livene
 
 ---
 
-## Repository Layout
+## Repository Structure
 
 ```
 ride-hail-services/
@@ -54,10 +54,6 @@ ride-hail-services/
 │   ├── go.mod / go.sum
 │   ├── Dockerfile
 │   └── sonar-project.properties
-├── jenkins/
-│   └── email/
-│       ├── success.txt
-│       └── failure.txt
 ├── Jenkinsfile
 ├── .gitignore
 └── README.md
@@ -99,6 +95,9 @@ The `Jenkinsfile` defines a CI-only pipeline. Jenkins runs on the `jenkins-vm` (
 | `sonarqube-token` | secret text | Authenticate with SonarQube |
 | `gitops-repo-credentials` | usernamePassword | Push image-tag commits to Repo 3 |
 
+Slack notifications are configured globally in Jenkins (Slack plugin).
+Security gate failures are reported per stage; success/failure summaries post automatically.
+
 ---
 
 ## Local Development
@@ -116,3 +115,25 @@ go run .
 cd dispatch && go test -v ./...
 cd ../notification && go test -v ./...
 ```
+
+---
+
+## Key Design Decisions
+
+| Decision | Rationale |
+|---|---|
+| DooD for CI agents | Sibling containers share the Docker daemon; avoids DinD privilege risks |
+| Per-stage Slack notifications | Security gate failures reported immediately, not just at pipeline end |
+| `when { branch 'main' }` on GitOps Update | PRs run CI only; deployment triggers only on merges to main |
+| Multi-stage Docker build | `golang:alpine` build → `alpine` runtime; minimal attack surface |
+| No `kubectl` in pipeline | Pull-based CD — Jenkins never touches the cluster (Principle #3) |
+| govulncheck + Trivy + SonarQube | Defense in depth — dependencies, images, and code quality all gated |
+
+---
+
+## Global Principles
+
+1. **Declarative** — Every state is described in Git. No manual `kubectl` or ad-hoc `sh` for final cluster state.
+2. **Repo Separation** — Each repo owns a single concern: infrastructure, code, or desired state.
+3. **Pull-Based CD** — Jenkins pushes images; ArgoCD pulls manifests from Repo 3.
+4. **Folders > Branches** — Environment differences are directory overlays in Repo 3.

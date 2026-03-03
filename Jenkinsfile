@@ -8,6 +8,9 @@
 //   - docker-registry-credentials  (usernamePassword)  — Docker Hub push
 //   - sonarqube-token              (string)             — SonarQube analysis
 //   - gitops-repo-credentials      (usernamePassword)   — push image tag to ride-hail-gitops
+//
+// Notifications: Slack (Jenkins Slack plugin configured globally).
+// Security gate failures are reported individually per stage.
 // =============================================================================
 
 pipeline {
@@ -69,6 +72,19 @@ pipeline {
                                     '''
                                 }
                             }
+                            post {
+                                failure {
+                                    slackSend(
+                                        color: 'danger',
+                                        message: ":x: *Unit Test Failed — dispatch*\n" +
+                                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                                            "Branch: ${env.GIT_BRANCH}\n" +
+                                            "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                            ">`go vet` or `go test` failed for the dispatch service.\n" +
+                                            "><${env.BUILD_URL}console|View Console Output>"
+                                    )
+                                }
+                            }
                         }
 
                         stage('Test Notification') {
@@ -90,6 +106,19 @@ pipeline {
                                         go test -v -coverprofile=coverage.out ./... || echo "No tests yet"
                                         echo "=== [notification] Tests complete ==="
                                     '''
+                                }
+                            }
+                            post {
+                                failure {
+                                    slackSend(
+                                        color: 'danger',
+                                        message: ":x: *Unit Test Failed — notification*\n" +
+                                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                                            "Branch: ${env.GIT_BRANCH}\n" +
+                                            "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                            ">`go vet` or `go test` failed for the notification service.\n" +
+                                            "><${env.BUILD_URL}console|View Console Output>"
+                                    )
                                 }
                             }
                         }
@@ -114,6 +143,19 @@ pipeline {
                                     echo "=== Dependency scan complete — no known vulnerabilities ==="
                                 '''
                             }
+                            post {
+                                failure {
+                                    slackSend(
+                                        color: 'danger',
+                                        message: ":warning: *Dependency Vulnerability Detected*\n" +
+                                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                                            "Branch: ${env.GIT_BRANCH}\n" +
+                                            "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                            ">`govulncheck` found known vulnerabilities in Go dependencies.\n" +
+                                            "><${env.BUILD_URL}console|View Console Output>"
+                                    )
+                                }
+                            }
                         }
 
                     }
@@ -128,19 +170,31 @@ pipeline {
                         }
                     }
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                                sh '''
-                                    echo "=== [dispatch] Running SonarQube analysis ==="
-                                    cd dispatch
-                                    sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
-                                    echo "=== [dispatch] SonarQube analysis submitted ==="
-                                    echo "=== [notification] Running SonarQube analysis ==="
-                                    cd ../notification
-                                    sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
-                                    echo "=== [notification] SonarQube analysis submitted ==="
-                                '''
-                            }
+                        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                            sh '''
+                                echo "=== [dispatch] Running SonarQube analysis ==="
+                                cd dispatch
+                                sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
+                                echo "=== [dispatch] SonarQube analysis submitted ==="
+                                echo "=== [notification] Running SonarQube analysis ==="
+                                cd ../notification
+                                sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
+                                echo "=== [notification] SonarQube analysis submitted ==="
+                            '''
+                        }
+                    }
+                    post {
+                        failure {
+                            slackSend(
+                                color: 'danger',
+                                message: ":warning: *SonarQube Quality Gate Failed*\n" +
+                                    "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                                    "Branch: ${env.GIT_BRANCH}\n" +
+                                    "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                    ">Static analysis did not pass the quality gate.\n" +
+                                    ">SonarQube: ${SONAR_HOST}\n" +
+                                    "><${env.BUILD_URL}console|View Console Output>"
+                            )
                         }
                     }
                 }
@@ -193,6 +247,20 @@ pipeline {
                             [ $SCAN_FAILED -eq 0 ] || { echo "Security gate failed — not pushing."; exit 1; }
                             echo "=== Security gate passed — both images are clean ==="
                         '''
+                    }
+                    post {
+                        failure {
+                            slackSend(
+                                color: 'danger',
+                                message: ":rotating_light: *Container Image CVE Gate Failed*\n" +
+                                    "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                                    "Branch: ${env.GIT_BRANCH}\n" +
+                                    "Commit: `${env.GIT_COMMIT?.take(7)}`\n" +
+                                    ">Trivy detected HIGH or CRITICAL vulnerabilities.\n" +
+                                    ">Images were *not* pushed to the registry.\n" +
+                                    "><${env.BUILD_URL}console|View Console Output>"
+                            )
+                        }
                     }
                 }
 
@@ -301,42 +369,38 @@ pipeline {
     post {
         success {
             node('built-in') {
-                script {
-                    echo "Pipeline completed successfully! Published version: ${env.IMAGE_TAG}"
-                    def body = readFile('jenkins/email/success.txt')
-                        .replace('@@BUILD_NUMBER@@',   env.BUILD_NUMBER              ?: '')
-                        .replace('@@GIT_COMMIT@@',     env.GIT_COMMIT               ?: '')
-                        .replace('@@GIT_BRANCH@@',     env.GIT_BRANCH               ?: 'N/A')
-                        .replace('@@IMAGE_TAG@@',      env.IMAGE_TAG                ?: '')
-                        .replace('@@BUILD_DURATION@@', currentBuild.durationString  ?: '')
-                        .replace('@@DOCKER_REGISTRY@@', DOCKER_REGISTRY             ?: '')
-                        .replace('@@TIMESTAMP@@',      new Date().toString())
-                    mail(
-                        to:      'honguyenminhsang2005@gmail.com',
-                        subject: "\u2713 CI Pipeline Success - Build #${env.BUILD_NUMBER}",
-                        body:    body
-                    )
-                }
+                slackSend(
+                    color: 'good',
+                    message: ":white_check_mark: *CI Pipeline Success — ride-hail-services*\n" +
+                        "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                        "Branch: ${env.GIT_BRANCH}\n" +
+                        "Commit: `${env.GIT_COMMIT?.take(7) ?: 'N/A'}` | " +
+                        "Tag: `${env.IMAGE_TAG}`\n" +
+                        "Duration: ${currentBuild.durationString}\n\n" +
+                        "*Security Gates:*\n" +
+                        ":white_check_mark: Unit Tests (dispatch + notification)\n" +
+                        ":white_check_mark: Dependency Scan (govulncheck)\n" +
+                        ":white_check_mark: SonarQube Quality Gate\n" +
+                        ":white_check_mark: Container Image Scan (Trivy)\n\n" +
+                        "*Published:*\n" +
+                        "`${DOCKER_REGISTRY}/dispatch-service:${env.IMAGE_TAG}`\n" +
+                        "`${DOCKER_REGISTRY}/notification-service:${env.IMAGE_TAG}`"
+                )
             }
         }
 
         failure {
             node('built-in') {
-                script {
-                    echo "Pipeline failed! Check logs for details."
-                    def body = readFile('jenkins/email/failure.txt')
-                        .replace('@@BUILD_NUMBER@@',   env.BUILD_NUMBER              ?: '')
-                        .replace('@@GIT_COMMIT@@',     env.GIT_COMMIT               ?: '')
-                        .replace('@@GIT_BRANCH@@',     env.GIT_BRANCH               ?: '')
-                        .replace('@@STAGE_NAME@@',     env.STAGE_NAME               ?: 'Unknown')
-                        .replace('@@BUILD_DURATION@@', currentBuild.durationString  ?: '')
-                        .replace('@@TIMESTAMP@@',      new Date().toString())
-                    mail(
-                        to:      'honguyenminhsang2005@gmail.com',
-                        subject: "\u2717 CI Pipeline FAILURE - Build #${env.BUILD_NUMBER}",
-                        body:    body
-                    )
-                }
+                slackSend(
+                    color: 'danger',
+                    message: ":x: *CI Pipeline Failed — ride-hail-services*\n" +
+                        "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                        "Branch: ${env.GIT_BRANCH}\n" +
+                        "Commit: `${env.GIT_COMMIT?.take(7) ?: 'N/A'}`\n" +
+                        "Duration: ${currentBuild.durationString}\n" +
+                        "Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}\n\n" +
+                        "><${env.BUILD_URL}console|View Console Output>"
+                )
             }
         }
     }
