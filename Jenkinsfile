@@ -57,7 +57,7 @@ pipeline {
                         stage('Test Dispatch') {
                             agent {
                                 docker {
-                                    image 'golang:1.25.7-alpine'
+                                    image 'golang:1.25.8-alpine'
                                     args  '-u root -e HOME=/root -e GOPATH=/root/go -v /tmp/go-mod-cache:/root/go/pkg/mod -v /tmp/go-build-cache:/root/.cache/go-build'
                                     reuseNode true
                                 }
@@ -93,7 +93,7 @@ pipeline {
                         stage('Test Notification') {
                             agent {
                                 docker {
-                                    image 'golang:1.25.7-alpine'
+                                    image 'golang:1.25.8-alpine'
                                     args  '-u root -e HOME=/root -e GOPATH=/root/go -v /tmp/go-mod-cache:/root/go/pkg/mod -v /tmp/go-build-cache:/root/.cache/go-build'
                                     reuseNode true
                                 }
@@ -129,7 +129,7 @@ pipeline {
                         stage('Scan Dependencies') {
                             agent {
                                 docker {
-                                    image 'golang:1.25.7-alpine'
+                                    image 'golang:1.25.8-alpine'
                                     args  '-u root -e HOME=/root -e GOPATH=/root/go -v /tmp/go-mod-cache:/root/go/pkg/mod -v /tmp/go-build-cache:/root/.cache/go-build'
                                     reuseNode true
                                 }
@@ -183,7 +183,7 @@ pipeline {
                             // TEST HOOK: Uncomment to force a SonarQube failure.
                             // Revert before merge.
                             // -------------------------------------------------------
-                            error('TEST: Deliberate SonarQube failure — verify Slack notification')
+                            // error('TEST: Deliberate SonarQube failure — verify Slack notification')
                             sh '''
                                 echo "=== [dispatch] Running SonarQube analysis ==="
                                 cd dispatch
