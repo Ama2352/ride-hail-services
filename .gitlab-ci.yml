@@ -136,8 +136,8 @@ gitops_update_dev:
     - GITOPS_URL=$(echo "$GITOPS_REPO_URL" | sed "s|https://|https://oauth2:$GITOPS_PUSH_TOKEN@|")
     - git clone --branch "$GITOPS_BRANCH" --depth 1 "$GITOPS_URL" gitops-workspace
     - cd gitops-workspace
-    - sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/dispatch/overlays/dev/kustomization.yaml
-    - sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/notification/overlays/dev/kustomization.yaml
+    - 'sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/dispatch/overlays/dev/kustomization.yaml'
+    - 'sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/notification/overlays/dev/kustomization.yaml'
     - git config user.email "gitlab-ci@ride-hail.ci"
     - git config user.name "GitLab CI"
     - git add apps/dispatch/overlays/dev/kustomization.yaml apps/notification/overlays/dev/kustomization.yaml
