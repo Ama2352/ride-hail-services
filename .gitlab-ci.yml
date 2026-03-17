@@ -8,7 +8,7 @@ stages:
 
 variables:
   DOCKER_REGISTRY: docker.io/ama2352
-  SONAR_HOST: http://192.168.242.10:30090
+  SONAR_HOST: https://didactically-keyed-cuc.ngrok-free.dev
   GITOPS_BRANCH: main
   DOCKER_TLS_CERTDIR: ""
   DOCKER_HOST: tcp://docker:2375
