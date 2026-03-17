@@ -142,12 +142,5 @@ gitops_update_dev:
     - git config user.name "GitLab CI"
     - git add apps/dispatch/overlays/dev/kustomization.yaml apps/notification/overlays/dev/kustomization.yaml
     - git diff --cached --quiet && echo "No GitOps changes" && exit 0
-    - |
-      git commit -m "ci: update image tags to $IMAGE_TAG
-
-      Triggered by GitLab pipeline $CI_PIPELINE_ID
-      Commit: $CI_COMMIT_SHA
-      Images:
-        - $DOCKER_REGISTRY/dispatch-service:$IMAGE_TAG
-        - $DOCKER_REGISTRY/notification-service:$IMAGE_TAG"
+    - "git commit -m \"ci: update image tags to $IMAGE_TAG\n\nTriggered by GitLab pipeline $CI_PIPELINE_ID\nCommit: $CI_COMMIT_SHA\nImages:\n  - $DOCKER_REGISTRY/dispatch-service:$IMAGE_TAG\n  - $DOCKER_REGISTRY/notification-service:$IMAGE_TAG\""
     - git push origin "$GITOPS_BRANCH"
