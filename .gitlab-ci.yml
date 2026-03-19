@@ -66,6 +66,8 @@ sonarqube_analysis:
   needs:
     - test_dispatch
     - test_notification
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "benchmark"'
   script:
     - cd dispatch
     - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.organization=$SONAR_ORG

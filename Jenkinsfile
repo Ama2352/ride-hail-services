@@ -224,6 +224,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'gitops-repo-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
                     sh '''
                         apk add --no-cache git sed
+                        rm -rf gitops-workspace
                         
                         GITOPS_URL=$(echo "${GITOPS_REPO}" | sed "s|https://|https://${GIT_USER}:${GIT_TOKEN}@|")
                         git clone --branch "${GITOPS_BRANCH}" --depth 1 "${GITOPS_URL}" gitops-workspace
