@@ -37,7 +37,7 @@ pipeline {
                     agent {
                         docker { 
                             image 'golang:1.25.8-alpine'
-                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                            args '-u 1000:1000 -v /tmp/go-mod-cache:/go/pkg/mod'
                         }
                     }
                     steps {
@@ -48,8 +48,9 @@ pipeline {
                                 go test -v -coverprofile=coverage.out ./...
                             '''
                         }
+                        sh 'test -s dispatch/coverage.out'
                         // Stash coverage report để SonarQube dùng ở stage sau
-                        stash name: 'coverage-dispatch', includes: 'dispatch/coverage.out', allowEmpty: true
+                        stash name: 'coverage-dispatch', includes: 'dispatch/coverage.out'
                     }
                 }
                 
@@ -57,7 +58,7 @@ pipeline {
                     agent {
                         docker { 
                             image 'golang:1.25.8-alpine'
-                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                            args '-u 1000:1000 -v /tmp/go-mod-cache:/go/pkg/mod'
                         }
                     }
                     steps {
@@ -68,7 +69,8 @@ pipeline {
                                 go test -v -coverprofile=coverage.out ./...
                             '''
                         }
-                        stash name: 'coverage-notification', includes: 'notification/coverage.out', allowEmpty: true
+                        sh 'test -s notification/coverage.out'
+                        stash name: 'coverage-notification', includes: 'notification/coverage.out'
                     }
                 }
 
@@ -95,7 +97,7 @@ pipeline {
             agent {
                 docker { 
                     image 'sonarsource/sonar-scanner-cli:11.3'
-                    args '-u root'
+                    args '-u 1000:1000'
                 }
             }
             steps {
