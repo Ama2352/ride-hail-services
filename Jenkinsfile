@@ -1,16 +1,5 @@
 // =============================================================================
-// Jenkinsfile — ride-hail-services
-//
-// CI pipeline: test → scan → build → push → GitOps update.
-// Never touches the cluster directly. Deployment is pull-based via ArgoCD.
-//
-// Credentials required in Jenkins:
-//   - docker-registry-credentials  (usernamePassword)  — Docker Hub push
-//   - sonarqube-token              (string)             — SonarQube analysis
-//   - gitops-repo-credentials      (usernamePassword)   — push image tag to ride-hail-gitops
-//
-// Notifications: Slack (Jenkins Slack plugin configured globally).
-// Security gate failures are reported individually per stage.
+// Jenkinsfile — ride-hail-services (Benchmark Optimized)
 // =============================================================================
 
 pipeline {
@@ -18,9 +7,10 @@ pipeline {
 
     environment {
         DOCKER_REGISTRY   = "docker.io/ama2352"
-        SONAR_HOST        = "http://192.168.242.10:30090"
+        SONAR_HOST        = "https://sonarcloud.io"
+        SONAR_ORG         = "ama2352"
         GITOPS_REPO       = "https://github.com/ama2352/ride-hail-gitops.git"
-        GITOPS_BRANCH     = "main"
+        GITOPS_BRANCH     = "benchmark"
     }
 
     options {
@@ -30,395 +20,208 @@ pipeline {
     }
 
     stages {
-
-        // CI stages run inside Docker sibling containers on the Jenkins host.
-        stage('CI') {
-            agent { label 'built-in' }
-
-            stages {
-
-                stage('Checkout') {
-                    steps {
-                        echo "Checking out source code from SCM..."
-                        checkout scm
-                        script {
-                            // Capture short hash here — GIT_COMMIT is only available after
-                            // checkout scm. BRANCH_NAME is set by Multibranch Pipeline.
-                            env.GIT_SHORT = env.GIT_COMMIT?.take(7) ?: 'unknown'
-                            env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_SHORT}"
-                            echo "Branch: ${env.BRANCH_NAME} | Commit: ${env.GIT_SHORT} | Tag: ${env.IMAGE_TAG}"
-                        }
-                    }
+        stage('Checkout') {
+            agent any
+            steps {
+                checkout scm
+                script {
+                    env.GIT_SHORT = env.GIT_COMMIT?.take(7) ?: 'unknown'
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_SHORT}"
                 }
-
-                stage('Verify Source') {
-                    parallel {
-
-                        stage('Test Dispatch') {
-                            agent {
-                                docker {
-                                    image 'golang:1.25.8-alpine'
-                                    args  '-u root -e HOME=/root -e GOPATH=/root/go -v /tmp/go-mod-cache:/root/go/pkg/mod -v /tmp/go-build-cache:/root/.cache/go-build'
-                                    reuseNode true
-                                }
-                            }
-                            steps {
-                                dir('dispatch') {
-                                    sh '''
-                                        echo "=== [dispatch] Downloading Go modules ==="
-                                        go mod download
-                                        echo "=== [dispatch] Running go vet ==="
-                                        go vet ./...
-                                        echo "=== [dispatch] Running unit tests ==="
-                                        go test -v -coverprofile=coverage.out ./... || echo "No tests yet"
-                                        echo "=== [dispatch] Tests complete ==="
-                                    '''
-                                }
-                            }
-                            post {
-                                failure {
-                                    slackSend(
-                                        color: 'danger',
-                                        message: ":x: *Unit Test Failed — dispatch*\n" +
-                                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                            "Branch: ${env.BRANCH_NAME}\n" +
-                                            "Commit: `${env.GIT_SHORT}`\n" +
-                                            ">`go vet` or `go test` failed for the dispatch service.\n" +
-                                            "><${env.BUILD_URL}console|View Console Output>"
-                                    )
-                                }
-                            }
-                        }
-
-                        stage('Test Notification') {
-                            agent {
-                                docker {
-                                    image 'golang:1.25.8-alpine'
-                                    args  '-u root -e HOME=/root -e GOPATH=/root/go -v /tmp/go-mod-cache:/root/go/pkg/mod -v /tmp/go-build-cache:/root/.cache/go-build'
-                                    reuseNode true
-                                }
-                            }
-                            steps {
-                                dir('notification') {
-                                    sh '''
-                                        echo "=== [notification] Downloading Go modules ==="
-                                        go mod download
-                                        echo "=== [notification] Running go vet ==="
-                                        go vet ./...
-                                        echo "=== [notification] Running unit tests ==="
-                                        go test -v -coverprofile=coverage.out ./... || echo "No tests yet"
-                                        echo "=== [notification] Tests complete ==="
-                                    '''
-                                }
-                            }
-                            post {
-                                failure {
-                                    slackSend(
-                                        color: 'danger',
-                                        message: ":x: *Unit Test Failed — notification*\n" +
-                                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                            "Branch: ${env.BRANCH_NAME}\n" +
-                                            "Commit: `${env.GIT_SHORT}`\n" +
-                                            ">`go vet` or `go test` failed for the notification service.\n" +
-                                            "><${env.BUILD_URL}console|View Console Output>"
-                                    )
-                                }
-                            }
-                        }
-
-                        stage('Scan Dependencies') {
-                            agent {
-                                docker {
-                                    image 'golang:1.25.8-alpine'
-                                    args  '-u root -e HOME=/root -e GOPATH=/root/go -v /tmp/go-mod-cache:/root/go/pkg/mod -v /tmp/go-build-cache:/root/.cache/go-build'
-                                    reuseNode true
-                                }
-                            }
-                            steps {
-                                // -------------------------------------------------------
-                                // TEST HOOK: Uncomment the line below to force a failure
-                                // and verify Slack failure notifications. Revert before merge.
-                                // -------------------------------------------------------
-                                // error('TEST: Deliberate failure — verify Slack notification')
-                                sh '''
-                                    echo "=== Installing govulncheck ==="
-                                    go install golang.org/x/vuln/cmd/govulncheck@latest
-                                    GOVULNCHECK=$(go env GOPATH)/bin/govulncheck
-                                    echo "=== [dispatch] Scanning for known vulnerabilities ==="
-                                    cd dispatch && $GOVULNCHECK ./...
-                                    echo "=== [notification] Scanning for known vulnerabilities ==="
-                                    cd ../notification && $GOVULNCHECK ./...
-                                    echo "=== Dependency scan complete — no known vulnerabilities ==="
-                                '''
-                            }
-                            post {
-                                failure {
-                                    slackSend(
-                                        color: 'danger',
-                                        message: ":warning: *Dependency Vulnerability Detected*\n" +
-                                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                            "Branch: ${env.BRANCH_NAME}\n" +
-                                            "Commit: `${env.GIT_SHORT}`\n" +
-                                            ">`govulncheck` found known vulnerabilities in Go dependencies.\n" +
-                                            "><${env.BUILD_URL}console|View Console Output>"
-                                    )
-                                }
-                            }
-                        }
-
-                    }
-                }
-
-                stage('SonarQube Analysis') {
-                    agent {
-                        docker {
-                            image 'sonarsource/sonar-scanner-cli:11.3'
-                            args  '-u root -e HOME=/root -v /tmp/sonar-cache:/root/.sonar/cache'
-                            reuseNode true
-                        }
-                    }
-                    steps {
-                        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                            // -------------------------------------------------------
-                            // TEST HOOK: Uncomment to force a SonarQube failure.
-                            // Revert before merge.
-                            // -------------------------------------------------------
-                            // error('TEST: Deliberate SonarQube failure — verify Slack notification')
-                            sh '''
-                                echo "=== [dispatch] Running SonarQube analysis ==="
-                                cd dispatch
-                                sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
-                                echo "=== [dispatch] SonarQube analysis submitted ==="
-                                echo "=== [notification] Running SonarQube analysis ==="
-                                cd ../notification
-                                sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN}
-                                echo "=== [notification] SonarQube analysis submitted ==="
-                            '''
-                        }
-                    }
-                    post {
-                        failure {
-                            slackSend(
-                                color: 'danger',
-                                message: ":warning: *SonarQube Quality Gate Failed*\n" +
-                                    "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                    "Branch: ${env.BRANCH_NAME}\n" +
-                                    "Commit: `${env.GIT_SHORT}`\n" +
-                                    ">Static analysis did not pass the quality gate.\n" +
-                                    ">SonarQube: ${SONAR_HOST}\n" +
-                                    "><${env.BUILD_URL}console|View Console Output>"
-                            )
-                        }
-                    }
-                }
-
-                stage('Build Images') {
-                    agent {
-                        docker {
-                            image 'docker:26-cli'
-                            args  '-v /var/run/docker.sock:/var/run/docker.sock -u root'
-                            reuseNode true
-                        }
-                    }
-                    steps {
-                        sh '''
-                            set -e
-                            echo "=== [dispatch] Building Docker image: dispatch-service:${IMAGE_TAG} ==="
-                            docker build -t dispatch-service:${IMAGE_TAG}     dispatch
-                            echo "=== [dispatch] Saving image to tar for scanning ==="
-                            docker save  dispatch-service:${IMAGE_TAG}     -o dispatch-service.tar
-                            echo "=== [notification] Building Docker image: notification-service:${IMAGE_TAG} ==="
-                            docker build -t notification-service:${IMAGE_TAG} notification
-                            echo "=== [notification] Saving image to tar for scanning ==="
-                            docker save  notification-service:${IMAGE_TAG} -o notification-service.tar
-                            echo "=== Image tars ready for security scan ==="
-                            ls -lh *.tar
-                        '''
-                    }
-                }
-
-                stage('Scan Images') {
-                    agent {
-                        docker {
-                            image 'aquasec/trivy:0.48.3'
-                            args  '-u root -v /tmp/trivy-cache:/root/.cache/trivy --entrypoint='
-                            reuseNode true
-                        }
-                    }
-                    steps {
-                        // -------------------------------------------------------
-                        // TEST HOOK: Uncomment to force a Trivy CVE gate failure.
-                        // Revert before merge.
-                        // -------------------------------------------------------
-                        // error('TEST: Deliberate Trivy failure — verify Slack notification')
-                        sh '''
-                            set -e
-                            SCAN_FAILED=0
-                            echo "=== [dispatch] Scanning for HIGH/CRITICAL CVEs ==="
-                            trivy image --input dispatch-service.tar \
-                                --severity HIGH,CRITICAL --exit-code 1 --format table \
-                                || SCAN_FAILED=1
-                            echo "=== [notification] Scanning for HIGH/CRITICAL CVEs ==="
-                            trivy image --input notification-service.tar \
-                                --severity HIGH,CRITICAL --exit-code 1 --format table \
-                                || SCAN_FAILED=1
-                            [ $SCAN_FAILED -eq 0 ] || { echo "Security gate failed — not pushing."; exit 1; }
-                            echo "=== Security gate passed — both images are clean ==="
-                        '''
-                    }
-                    post {
-                        failure {
-                            slackSend(
-                                color: 'danger',
-                                message: ":rotating_light: *Container Image CVE Gate Failed*\n" +
-                                    "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                                    "Branch: ${env.BRANCH_NAME}\n" +
-                                    "Commit: `${env.GIT_SHORT}`\n" +
-                                    ">Trivy detected HIGH or CRITICAL vulnerabilities.\n" +
-                                    ">Images were *not* pushed to the registry.\n" +
-                                    "><${env.BUILD_URL}console|View Console Output>"
-                            )
-                        }
-                    }
-                }
-
-                stage('Push Images') {
-                    agent {
-                        docker {
-                            image 'docker:26-cli'
-                            args  '-v /var/run/docker.sock:/var/run/docker.sock -u root'
-                            reuseNode true
-                        }
-                    }
-                    steps {
-                        withCredentials([usernamePassword(
-                            credentialsId: 'docker-registry-credentials',
-                            usernameVariable: 'DOCKER_USER',
-                            passwordVariable: 'DOCKER_PASS'
-                        )]) {
-                            sh '''
-                                set -e
-                                echo "=== Authenticating with Docker registry ==="
-                                echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-
-                                echo "=== [dispatch] Tagging and pushing to ${DOCKER_REGISTRY} ==="
-                                docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
-                                docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:latest
-                                docker push ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
-                                docker push ${DOCKER_REGISTRY}/dispatch-service:latest
-
-                                echo "=== [notification] Tagging and pushing to ${DOCKER_REGISTRY} ==="
-                                docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
-                                docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:latest
-                                docker push ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
-                                docker push ${DOCKER_REGISTRY}/notification-service:latest
-
-                                echo "=== Cleaning up local images to free disk space ==="
-                                docker rmi dispatch-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/dispatch-service:latest || true
-                                docker rmi notification-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/notification-service:latest || true
-                                echo "=== All images pushed successfully ==="
-                            '''
-                        }
-                    }
-                }
-
             }
         }
 
-        // Updates the dev overlay image tag in ride-hail-gitops.
-        // ArgoCD detects the commit and reconciles the cluster.
-        // Only runs on the main branch — not on PRs or feature branches.
-        stage('GitOps Update') {
-            when { branch 'main' }
-            agent { label 'built-in' }
-
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'gitops-repo-credentials',
-                    usernameVariable: 'GIT_USER',
-                    passwordVariable: 'GIT_TOKEN'
-                )]) {
-                    sh '''
-                        set -e
-                        echo "=== Cloning GitOps repository ==="
-                        GITOPS_URL=$(echo "${GITOPS_REPO}" | sed "s|https://|https://${GIT_USER}:${GIT_TOKEN}@|")
-                        rm -rf gitops-workspace
-                        git clone --branch "${GITOPS_BRANCH}" --depth 1 "${GITOPS_URL}" gitops-workspace
-                        cd gitops-workspace
-
-                        # Update the Kustomize overlay newTag — this is the ONLY line ArgoCD needs.
-                        # The base k8s.yaml image name stays constant; only the tag changes.
-                        echo "=== Updating dispatch dev overlay image tag ==="
-                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" \
-                            apps/dispatch/overlays/dev/kustomization.yaml
-                        echo "    apps/dispatch/overlays/dev/kustomization.yaml → newTag: ${IMAGE_TAG}"
-
-                        echo "=== Updating notification dev overlay image tag ==="
-                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" \
-                            apps/notification/overlays/dev/kustomization.yaml
-                        echo "    apps/notification/overlays/dev/kustomization.yaml → newTag: ${IMAGE_TAG}"
-
-                        echo "=== Committing and pushing to GitOps repo ==="
-                        git config user.email "jenkins@ride-hail.ci"
-                        git config user.name "Jenkins CI"
-                        git add -A
-                        git diff --cached --quiet && {
-                            echo "No manifest changes detected — nothing to commit."
-                            exit 0
+        stage('Verify') {
+            parallel {
+                stage('Test Dispatch') {
+                    agent {
+                        docker { 
+                            image 'golang:1.25.8-alpine'
+                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
                         }
-                        MSG=$(printf 'ci: update image tags to %s\n\nTriggered by ride-hail-services build #%s\nCommit: %s\nImages:\n  - %s/dispatch-service:%s\n  - %s/notification-service:%s' \
-                            "${IMAGE_TAG}" "${BUILD_NUMBER}" "${GIT_COMMIT}" \
-                            "${DOCKER_REGISTRY}" "${IMAGE_TAG}" \
-                            "${DOCKER_REGISTRY}" "${IMAGE_TAG}")
-                        git commit -m "$MSG"
-                        git push origin "${GITOPS_BRANCH}"
-                        echo "=== GitOps repo updated — ArgoCD will reconcile ==="
+                    }
+                    steps {
+                        dir('dispatch') {
+                            sh '''
+                                go mod download
+                                go vet ./...
+                                go test -v -coverprofile=coverage.out ./...
+                            '''
+                        }
+                        // Stash coverage report để SonarQube dùng ở stage sau
+                        stash name: 'coverage-dispatch', includes: 'dispatch/coverage.out', allowEmpty: true
+                    }
+                }
+                
+                stage('Test Notification') {
+                    agent {
+                        docker { 
+                            image 'golang:1.25.8-alpine'
+                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                        }
+                    }
+                    steps {
+                        dir('notification') {
+                            sh '''
+                                go mod download
+                                go vet ./...
+                                go test -v -coverprofile=coverage.out ./...
+                            '''
+                        }
+                        stash name: 'coverage-notification', includes: 'notification/coverage.out', allowEmpty: true
+                    }
+                }
+
+                stage('Scan Dependencies') {
+                    agent {
+                        docker { 
+                            image 'golang:1.25.8-alpine'
+                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                        }
+                    }
+                    steps {
+                        sh '''
+                            go install golang.org/x/vuln/cmd/govulncheck@latest
+                            export PATH=$PATH:$(go env GOPATH)/bin
+                            cd dispatch && govulncheck ./...
+                            cd ../notification && govulncheck ./...
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            agent {
+                docker { 
+                    image 'sonarsource/sonar-scanner-cli:11.3'
+                    args '-u root'
+                }
+            }
+            steps {
+                unstash 'coverage-dispatch'
+                unstash 'coverage-notification'
+                
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        # Quét Dispatch
+                        cd dispatch
+                        sonar-scanner \
+                            -Dsonar.projectKey=ama2352_ridehail-dispatch-service \
+                            -Dsonar.organization=${SONAR_ORG} \
+                            -Dsonar.host.url=${SONAR_HOST} \
+                            -Dsonar.token=${SONAR_TOKEN} \
+                            -Dsonar.qualitygate.wait=false \
+                            -Dsonar.go.coverage.reportPaths=coverage.out
+
+                        # Quét Notification
+                        cd ../notification
+                        sonar-scanner \
+                            -Dsonar.projectKey=ama2352_ridehail-notification-service \
+                            -Dsonar.organization=${SONAR_ORG} \
+                            -Dsonar.host.url=${SONAR_HOST} \
+                            -Dsonar.token=${SONAR_TOKEN} \
+                            -Dsonar.qualitygate.wait=false \
+                            -Dsonar.go.coverage.reportPaths=coverage.out
                     '''
                 }
             }
         }
 
-    }
-
-    post {
-        success {
-            node('built-in') {
-                slackSend(
-                    color: 'good',
-                    message: ":white_check_mark: *CI Pipeline Success — ride-hail-services*\n" +
-                        "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                        "Branch: ${env.BRANCH_NAME}\n" +
-                        "Commit: `${env.GIT_SHORT}` | " +
-                        "Tag: `${env.IMAGE_TAG}`\n" +
-                        "Duration: ${currentBuild.durationString}\n\n" +
-                        "*Security Gates:*\n" +
-                        ":white_check_mark: Unit Tests (dispatch + notification)\n" +
-                        ":white_check_mark: Dependency Scan (govulncheck)\n" +
-                        ":white_check_mark: SonarQube Quality Gate\n" +
-                        ":white_check_mark: Container Image Scan (Trivy)\n\n" +
-                        "*Published:*\n" +
-                        "`${DOCKER_REGISTRY}/dispatch-service:${env.IMAGE_TAG}`\n" +
-                        "`${DOCKER_REGISTRY}/notification-service:${env.IMAGE_TAG}`"
-                )
+        stage('Build Images') {
+            agent {
+                docker {
+                    image 'docker:26-cli'
+                    // Mount socket để áp dụng chuẩn DooD giống GitLab Runner
+                    args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
+                }
+            }
+            steps {
+                sh '''
+                    docker build -t dispatch-service:${IMAGE_TAG} dispatch
+                    docker save dispatch-service:${IMAGE_TAG} -o dispatch-service.tar
+                    
+                    docker build -t notification-service:${IMAGE_TAG} notification
+                    docker save notification-service:${IMAGE_TAG} -o notification-service.tar
+                '''
+                // Pass file tar sang stage Scan giống như artifacts trong GitLab
+                stash name: 'tar-images', includes: '*.tar'
             }
         }
 
-        failure {
-            node('built-in') {
-                slackSend(
-                    color: 'danger',
-                    message: ":x: *CI Pipeline Failed — ride-hail-services*\n" +
-                        "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                        "Branch: ${env.BRANCH_NAME}\n" +
-                        "Commit: `${env.GIT_SHORT ?: 'unknown'}`\n" +
-                        "Duration: ${currentBuild.durationString}\n" +
-                        "Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}\n\n" +
-                        "><${env.BUILD_URL}console|View Console Output>"
-                )
+        stage('Scan Images') {
+            agent {
+                docker {
+                    image 'aquasec/trivy:0.48.3'
+                    args '-u root --entrypoint='
+                }
+            }
+            steps {
+                unstash 'tar-images'
+                sh '''
+                    trivy image --input dispatch-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+                    trivy image --input notification-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+                '''
+            }
+        }
+
+        stage('Push Images') {
+            when { branch 'benchmark' }
+            agent {
+                docker {
+                    image 'docker:26-cli'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-registry-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                        
+                        docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
+                        docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:latest
+                        docker push ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/dispatch-service:latest
+
+                        docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
+                        docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:latest
+                        docker push ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/notification-service:latest
+                    '''
+                }
+            }
+        }
+
+        stage('GitOps Update') {
+            when { branch 'benchmark' }
+            agent {
+                docker { image 'alpine:3.20' }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'gitops-repo-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                    sh '''
+                        apk add --no-cache git sed
+                        
+                        GITOPS_URL=$(echo "${GITOPS_REPO}" | sed "s|https://|https://${GIT_USER}:${GIT_TOKEN}@|")
+                        git clone --branch "${GITOPS_BRANCH}" --depth 1 "${GITOPS_URL}" gitops-workspace
+                        cd gitops-workspace
+
+                        sed -i "s|newTag:.*|newTag: \\"${IMAGE_TAG}\\"|" apps/dispatch/overlays/dev/kustomization.yaml
+                        sed -i "s|newTag:.*|newTag: \\"${IMAGE_TAG}\\"|" apps/notification/overlays/dev/kustomization.yaml
+
+                        git config user.email "jenkins-ci@ride-hail.ci"
+                        git config user.name "Jenkins CI"
+                        git add apps/dispatch/overlays/dev/kustomization.yaml apps/notification/overlays/dev/kustomization.yaml
+                        git diff --cached --quiet && echo "No GitOps changes" && exit 0
+                        
+                        git commit -m "ci: update image tags to ${IMAGE_TAG}
+
+Triggered by Jenkins pipeline #${BUILD_NUMBER}
+Commit: ${GIT_SHORT}"
+                        
+                        git push origin "${GITOPS_BRANCH}"
+                    '''
+                }
             }
         }
     }
