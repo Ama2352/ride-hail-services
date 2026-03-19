@@ -13,6 +13,8 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   DOCKER_HOST: tcp://docker:2375
   IMAGE_TAG: "$CI_PIPELINE_IID-$CI_COMMIT_SHORT_SHA"
+  SONAR_HOST: "https://sonarcloud.io" 
+  SONAR_ORG: "ama2352"
 
 workflow:
   rules:
@@ -69,9 +71,9 @@ sonarqube_analysis:
     - test_notification
   script:
     - cd dispatch
-    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.organization=$SONAR_ORG
     - cd ../notification
-    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.organization=$SONAR_ORG
 
 build_images:
   stage: build
