@@ -35,7 +35,7 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Errorf("Expected service 'dispatch-service', got '%s'", response.Service)
 	}
 
-	if response.Status != "healthy" {
+	if response.Status != "healthy2" {
 		t.Errorf("Expected status 'healthy', got '%s'", response.Status)
 	}
 }
