@@ -3,14 +3,14 @@
 // =============================================================================
 
 pipeline {
-    agent none
+    agent any
 
     environment {
         DOCKER_REGISTRY   = "docker.io/ama2352"
         SONAR_HOST        = "https://sonarcloud.io"
         SONAR_ORG         = "ama2352"
         GITOPS_REPO       = "https://github.com/ama2352/ride-hail-gitops.git"
-        GITOPS_BRANCH     = "benchmark"
+        GITOPS_BRANCH     = "main"
     }
 
     options {
@@ -38,6 +38,7 @@ pipeline {
                         docker { 
                             image 'golang:1.25.8-alpine'
                             args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                            reuseNode true
                         }
                     }
                     steps {
@@ -57,8 +58,6 @@ pipeline {
                             '''
                         }
                         sh 'test -s dispatch/coverage.out'
-                        // Stash coverage report để SonarQube dùng ở stage sau
-                        stash name: 'coverage-dispatch', includes: 'dispatch/coverage.out'
                     }
                 }
                 
@@ -67,6 +66,7 @@ pipeline {
                         docker { 
                             image 'golang:1.25.8-alpine'
                             args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                            reuseNode true
                         }
                     }
                     steps {
@@ -86,7 +86,6 @@ pipeline {
                             '''
                         }
                         sh 'test -s notification/coverage.out'
-                        stash name: 'coverage-notification', includes: 'notification/coverage.out'
                     }
                 }
 
@@ -95,6 +94,7 @@ pipeline {
                         docker { 
                             image 'golang:1.25.8-alpine'
                             args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
+                            reuseNode true
                         }
                     }
                     steps {
@@ -113,13 +113,11 @@ pipeline {
             agent {
                 docker { 
                     image 'sonarsource/sonar-scanner-cli:11.3'
-                    args '-u 1000:1000'
+                    args '-u root'
+                    reuseNode true
                 }
             }
             steps {
-                unstash 'coverage-dispatch'
-                unstash 'coverage-notification'
-                
                 withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                     sh '''
                         # Quét Dispatch
@@ -152,18 +150,18 @@ pipeline {
                     image 'docker:26-cli'
                     // Mount socket để áp dụng chuẩn DooD giống GitLab Runner
                     args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
+                    reuseNode true
                 }
             }
             steps {
                 sh '''
                     docker build -t dispatch-service:${IMAGE_TAG} dispatch
                     docker save dispatch-service:${IMAGE_TAG} -o dispatch-service.tar
-                    
+
                     docker build -t notification-service:${IMAGE_TAG} notification
                     docker save notification-service:${IMAGE_TAG} -o notification-service.tar
+                    ls -lh *.tar
                 '''
-                // Pass file tar sang stage Scan giống như artifacts trong GitLab
-                stash name: 'tar-images', includes: '*.tar'
             }
         }
 
@@ -172,10 +170,10 @@ pipeline {
                 docker {
                     image 'aquasec/trivy:0.48.3'
                     args '-u root --entrypoint='
+                    reuseNode true
                 }
             }
             steps {
-                unstash 'tar-images'
                 sh '''
                     trivy image --input dispatch-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
                     trivy image --input notification-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
@@ -189,12 +187,15 @@ pipeline {
                 docker {
                     image 'docker:26-cli'
                     args '-v /var/run/docker.sock:/var/run/docker.sock -u root'
+                    reuseNode true
                 }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-registry-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                        docker load -i dispatch-service.tar
+                        docker load -i notification-service.tar
                         
                         docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
                         docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:latest
@@ -213,7 +214,11 @@ pipeline {
         stage('GitOps Update') {
             when { branch 'benchmark' }
             agent {
-                docker { image 'alpine:3.20' }
+                docker {
+                    image 'alpine:3.20'
+                    args '-u root'
+                    reuseNode true
+                }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'gitops-repo-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
