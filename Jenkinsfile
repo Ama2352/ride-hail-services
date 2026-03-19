@@ -37,15 +37,23 @@ pipeline {
                     agent {
                         docker { 
                             image 'golang:1.25.8-alpine'
-                            args '-u 1000:1000 -v /tmp/go-mod-cache:/go/pkg/mod'
+                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
                         }
                     }
                     steps {
                         dir('dispatch') {
                             sh '''
+                                export HOME=/tmp
+                                export GOCACHE=/tmp/go-build-cache
+                                export GOPATH=/tmp/go
+                                export GOMODCACHE=/tmp/go/pkg/mod
+                                mkdir -p "$GOCACHE" "$GOMODCACHE"
+                                rm -f coverage.out
                                 go mod download
                                 go vet ./...
                                 go test -v -coverprofile=coverage.out ./...
+                                chown 1000:1000 coverage.out || true
+                                chmod 0644 coverage.out
                             '''
                         }
                         sh 'test -s dispatch/coverage.out'
@@ -58,15 +66,23 @@ pipeline {
                     agent {
                         docker { 
                             image 'golang:1.25.8-alpine'
-                            args '-u 1000:1000 -v /tmp/go-mod-cache:/go/pkg/mod'
+                            args '-u root -v /tmp/go-mod-cache:/go/pkg/mod'
                         }
                     }
                     steps {
                         dir('notification') {
                             sh '''
+                                export HOME=/tmp
+                                export GOCACHE=/tmp/go-build-cache
+                                export GOPATH=/tmp/go
+                                export GOMODCACHE=/tmp/go/pkg/mod
+                                mkdir -p "$GOCACHE" "$GOMODCACHE"
+                                rm -f coverage.out
                                 go mod download
                                 go vet ./...
                                 go test -v -coverprofile=coverage.out ./...
+                                chown 1000:1000 coverage.out || true
+                                chmod 0644 coverage.out
                             '''
                         }
                         sh 'test -s notification/coverage.out'
