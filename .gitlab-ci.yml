@@ -76,6 +76,7 @@ build_images:
   stage: build
   image: docker:26-cli
   script:
+    - unset DOCKER_HOST
     - docker build -t dispatch-service:$IMAGE_TAG dispatch
     - docker save dispatch-service:$IMAGE_TAG -o dispatch-service.tar
     - docker build -t notification-service:$IMAGE_TAG notification
