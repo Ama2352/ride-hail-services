@@ -10,14 +10,8 @@ variables:
   DOCKER_REGISTRY: docker.io/ama2352
   GITOPS_BRANCH: main
   IMAGE_TAG: "$CI_PIPELINE_IID-$CI_COMMIT_SHORT_SHA"
-  SONAR_HOST: "https://sonarcloud.io" 
+  SONAR_HOST: "https://sonarcloud.io"
   SONAR_ORG: "ama2352"
-
-workflow:
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "benchmark"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME != "benchmark"'
-    - if: '$CI_PIPELINE_SOURCE == "push"'
 
 default:
   interruptible: true
@@ -67,8 +61,6 @@ sonarqube_analysis:
   needs:
     - test_dispatch
     - test_notification
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "benchmark"'
   script:
     - cd dispatch
     - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.organization=$SONAR_ORG
@@ -109,7 +101,7 @@ push_images:
     - build_images
     - scan_images
   rules:
-    - if: '$CI_COMMIT_BRANCH == "benchmark"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
   script:
     - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
     - docker load -i dispatch-service.tar
@@ -129,7 +121,7 @@ gitops_update_dev:
   needs:
     - push_images
   rules:
-    - if: '$CI_COMMIT_BRANCH == "benchmark"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
   script:
     - apk add --no-cache git sed
     - GITOPS_URL=$(echo "$GITOPS_REPO_URL" | sed -E "s|http(s)?://|http\1://oauth2:$GITOPS_PUSH_TOKEN@|")

@@ -182,7 +182,7 @@ pipeline {
         }
 
         stage('Push Images') {
-            when { branch 'benchmark' }
+            when { branch 'main' }
             agent {
                 docker {
                     image 'docker:26-cli'
@@ -212,7 +212,7 @@ pipeline {
         }
 
         stage('GitOps Update') {
-            when { branch 'benchmark' }
+            when { branch 'main' }
             agent {
                 docker {
                     image 'alpine:3.20'
