@@ -108,7 +108,7 @@ push_images:
     - build_images
     - scan_images
   rules:
-    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH == "benchmark"'
   script:
     - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
     - docker load -i dispatch-service.tar
@@ -128,7 +128,7 @@ gitops_update_dev:
   needs:
     - push_images
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH == "benchmark"'
   script:
     - apk add --no-cache git sed
     - GITOPS_URL=$(echo "$GITOPS_REPO_URL" | sed -E "s|http(s)?://|http\1://oauth2:$GITOPS_PUSH_TOKEN@|")
