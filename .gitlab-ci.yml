@@ -75,9 +75,6 @@ sonarqube_analysis:
 build_images:
   stage: build
   image: docker:26-cli
-  services:
-    - name: docker:26-dind
-      alias: docker
   script:
     - docker build -t dispatch-service:$IMAGE_TAG dispatch
     - docker save dispatch-service:$IMAGE_TAG -o dispatch-service.tar
