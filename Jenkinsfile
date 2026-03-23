@@ -19,7 +19,7 @@ pipeline {
     environment {
         DOCKER_REGISTRY   = "docker.io/ama2352"
         SONAR_HOST        = "http://192.168.242.10:30090"
-        GITOPS_REPO       = "https://github.com/ama2352/ride-hail-gitops.git"
+        GITOPS_REPO       = "https://gitlab.com/ride-hailing-devsecops/gitops.git"
         GITOPS_BRANCH     = "main"
     }
 
