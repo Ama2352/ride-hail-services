@@ -106,6 +106,8 @@ func metricsMiddleware(next http.Handler) http.Handler {
 func setupRouter(config Config) *http.ServeMux {
 	mux := http.NewServeMux()
 
+	initTracking()
+
 	// Prometheus metrics endpoint (required for monitoring)
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -118,9 +120,11 @@ func setupRouter(config Config) *http.ServeMux {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
 	})
+
+	mux.HandleFunc("/ws", trackingHandler)
 
 	return mux
 }
