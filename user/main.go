@@ -16,7 +16,10 @@ import (
 var privateKey *rsa.PrivateKey
 
 func init() {
-	keyPath := filepath.Join("..", ".keys", "private.pem")
+	keyPath := os.Getenv("PRIVATE_KEY_PATH")
+	if keyPath == "" {
+		keyPath = filepath.Join("..", ".keys", "private.pem")
+	}
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		log.Fatalf("Failed to read private key at %s: %v", keyPath, err)

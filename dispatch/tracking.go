@@ -23,7 +23,10 @@ var (
 )
 
 func initTracking() {
-	keyPath := filepath.Join("..", ".keys", "public.pem")
+	keyPath := os.Getenv("PUBLIC_KEY_PATH")
+	if keyPath == "" {
+		keyPath = filepath.Join("..", ".keys", "public.pem")
+	}
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		log.Printf("Warning: Failed to read public key at %s, skipping JWT init for tests: %v", keyPath, err)

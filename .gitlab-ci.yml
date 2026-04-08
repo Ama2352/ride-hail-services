@@ -25,6 +25,10 @@ default:
 test_dispatch:
   stage: verify
   image: golang:1.25.8-alpine
+  before_script:
+    - mkdir -p .keys
+    - cd .keys && go run ../scripts/generate_keys.go
+    - cd ..
   script:
     - cd dispatch
     - go mod download
@@ -50,6 +54,24 @@ test_notification:
       - notification/coverage.out
     expire_in: 1 day
 
+test_user:
+  stage: verify
+  image: golang:1.24-alpine
+  before_script:
+    - mkdir -p .keys
+    - cd .keys && go run ../scripts/generate_keys.go
+    - cd ..
+  script:
+    - cd user
+    - go mod download
+    - go vet ./...
+    - go test -v -coverprofile=coverage.out ./...
+  artifacts:
+    when: always
+    paths:
+      - user/coverage.out
+    expire_in: 1 day
+
 scan_dependencies:
   stage: verify
   image: golang:1.25.8-alpine
@@ -67,10 +89,13 @@ sonarqube_analysis:
   needs:
     - test_dispatch
     - test_notification
+    - test_user
   script:
     - cd dispatch
     - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
     - cd ../notification
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - cd ../user
     - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
 
 build_images:
@@ -84,11 +109,14 @@ build_images:
     - docker save dispatch-service:$IMAGE_TAG -o dispatch-service.tar
     - docker build -t notification-service:$IMAGE_TAG notification
     - docker save notification-service:$IMAGE_TAG -o notification-service.tar
+    - docker build -t user-service:$IMAGE_TAG user
+    - docker save user-service:$IMAGE_TAG -o user-service.tar
     - ls -lh *.tar
   artifacts:
     paths:
       - dispatch-service.tar
       - notification-service.tar
+      - user-service.tar
     expire_in: 1 day
 
 scan_images:
@@ -101,6 +129,7 @@ scan_images:
   script:
     - trivy image --input dispatch-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
     - trivy image --input notification-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+    - trivy image --input user-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
 
 push_images:
   stage: push
@@ -118,13 +147,12 @@ push_images:
     - docker load -i dispatch-service.tar
     - docker load -i notification-service.tar
     - docker tag dispatch-service:$IMAGE_TAG $DOCKER_REGISTRY/dispatch-service:$IMAGE_TAG
-    - docker tag dispatch-service:$IMAGE_TAG $DOCKER_REGISTRY/dispatch-service:latest
     - docker push $DOCKER_REGISTRY/dispatch-service:$IMAGE_TAG
-    - docker push $DOCKER_REGISTRY/dispatch-service:latest
     - docker tag notification-service:$IMAGE_TAG $DOCKER_REGISTRY/notification-service:$IMAGE_TAG
-    - docker tag notification-service:$IMAGE_TAG $DOCKER_REGISTRY/notification-service:latest
     - docker push $DOCKER_REGISTRY/notification-service:$IMAGE_TAG
-    - docker push $DOCKER_REGISTRY/notification-service:latest
+    - docker load -i user-service.tar
+    - docker tag user-service:$IMAGE_TAG $DOCKER_REGISTRY/user-service:$IMAGE_TAG
+    - docker push $DOCKER_REGISTRY/user-service:$IMAGE_TAG
 
 gitops_update_dev:
   stage: gitops
@@ -140,9 +168,10 @@ gitops_update_dev:
     - cd gitops-workspace
     - 'sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/dispatch/overlays/dev/kustomization.yaml'
     - 'sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/notification/overlays/dev/kustomization.yaml'
+    - 'sed -i "s|newTag:.*|newTag: \"$IMAGE_TAG\"|" apps/user/overlays/dev/kustomization.yaml'
     - git config user.email "gitlab-ci@ride-hail.ci"
     - git config user.name "GitLab CI"
-    - git add apps/dispatch/overlays/dev/kustomization.yaml apps/notification/overlays/dev/kustomization.yaml
+    - git add apps/dispatch/overlays/dev/kustomization.yaml apps/notification/overlays/dev/kustomization.yaml apps/user/overlays/dev/kustomization.yaml
     - git diff --cached --quiet && echo "No GitOps changes" && exit 0
-    - "git commit -m \"ci: update image tags to $IMAGE_TAG\n\nTriggered by GitLab pipeline $CI_PIPELINE_ID\nCommit: $CI_COMMIT_SHA\nImages:\n  - $DOCKER_REGISTRY/dispatch-service:$IMAGE_TAG\n  - $DOCKER_REGISTRY/notification-service:$IMAGE_TAG\""
+    - "git commit -m \"ci: update image tags to $IMAGE_TAG\n\nTriggered by GitLab pipeline $CI_PIPELINE_ID\nCommit: $CI_COMMIT_SHA\nImages:\n  - $DOCKER_REGISTRY/dispatch-service:$IMAGE_TAG\n  - $DOCKER_REGISTRY/notification-service:$IMAGE_TAG\n  - $DOCKER_REGISTRY/user-service:$IMAGE_TAG\""
     - git push origin "$GITOPS_BRANCH"
