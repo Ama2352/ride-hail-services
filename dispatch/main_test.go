@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -121,6 +123,22 @@ func TestStatusWriter(t *testing.T) {
 	sw2.Write([]byte("test"))
 	if sw2.status != http.StatusOK {
 		t.Errorf("Expected default status 200, got %d", sw2.status)
+	}
+}
+
+type hijackableRecorder struct {
+	*httptest.ResponseRecorder
+}
+
+func (h *hijackableRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, nil
+}
+
+func TestStatusWriterHijack(t *testing.T) {
+	base := &hijackableRecorder{ResponseRecorder: httptest.NewRecorder()}
+	sw := &statusWriter{ResponseWriter: base, status: http.StatusOK}
+	if _, _, err := sw.Hijack(); err != nil {
+		t.Fatalf("expected Hijack passthrough without error, got %v", err)
 	}
 }
 
