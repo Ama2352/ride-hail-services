@@ -82,6 +82,7 @@ func TestTrackingHandler(t *testing.T) {
 	t.Run("NoPubKey", func(t *testing.T) {
 		oldKey := publicKey
 		publicKey = nil
+		t.Setenv("PUBLIC_KEY_PATH", filepath.Join(t.TempDir(), "missing-public.pem"))
 		resp, _ := http.Get(server.URL + "?token=" + validToken)
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("expected 500, got %d", resp.StatusCode)
