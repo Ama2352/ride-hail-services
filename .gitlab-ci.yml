@@ -24,7 +24,7 @@ default:
 
 test_dispatch:
   stage: verify
-  image: golang:1.25.8-alpine
+  image: golang:1.25.9-alpine
   before_script:
     - mkdir -p .keys
     - cd .keys && go run ../scripts/generate_keys.go
@@ -34,6 +34,7 @@ test_dispatch:
     - go mod download
     - go vet ./...
     - go test -v -coverprofile=coverage.out ./...
+    - cd ..
   artifacts:
     when: always
     paths:
@@ -42,12 +43,13 @@ test_dispatch:
 
 test_notification:
   stage: verify
-  image: golang:1.25.8-alpine
+  image: golang:1.25.9-alpine
   script:
     - cd notification
     - go mod download
     - go vet ./...
     - go test -v -coverprofile=coverage.out ./...
+    - cd ..
   artifacts:
     when: always
     paths:
@@ -56,7 +58,7 @@ test_notification:
 
 test_user:
   stage: verify
-  image: golang:1.24-alpine
+  image: golang:1.25.9-alpine
   before_script:
     - mkdir -p .keys
     - cd .keys && go run ../scripts/generate_keys.go
@@ -66,6 +68,7 @@ test_user:
     - go mod download
     - go vet ./...
     - go test -v -coverprofile=coverage.out ./...
+    - cd ..
   artifacts:
     when: always
     paths:
@@ -74,7 +77,7 @@ test_user:
 
 scan_dependencies:
   stage: verify
-  image: golang:1.25.8-alpine
+  image: golang:1.25.9-alpine
   script:
     - go install golang.org/x/vuln/cmd/govulncheck@latest
     - GOVULNCHECK=$(go env GOPATH)/bin/govulncheck
