@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,25 +17,45 @@ import (
 
 var (
 	publicKey *rsa.PublicKey
+	publicKeyPath string
 	rdb       *redis.Client
 	upgrader  = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 )
 
-func initTracking() {
-	keyPath := os.Getenv("PUBLIC_KEY_PATH")
-	if keyPath == "" {
-		keyPath = filepath.Join("..", ".keys", "public.pem")
+func resolvePublicKeyPath() string {
+	if keyPath := os.Getenv("PUBLIC_KEY_PATH"); keyPath != "" {
+		return keyPath
 	}
-	keyData, err := os.ReadFile(keyPath)
+	return filepath.Join("..", ".keys", "public.pem")
+}
+
+func tryLoadPublicKey() error {
+	publicKeyPath = resolvePublicKeyPath()
+	keyData, err := os.ReadFile(publicKeyPath)
 	if err != nil {
-		log.Printf("Warning: Failed to read public key at %s, skipping JWT init for tests: %v", keyPath, err)
-	} else {
-		publicKey, err = jwt.ParseRSAPublicKeyFromPEM(keyData)
-		if err != nil {
-			log.Printf("Warning: Failed to parse public key: %v", err)
-		}
+		return fmt.Errorf("failed to read public key at %s: %w", publicKeyPath, err)
+	}
+	parsedKey, err := jwt.ParseRSAPublicKeyFromPEM(keyData)
+	if err != nil {
+		return fmt.Errorf("failed to parse public key at %s: %w", publicKeyPath, err)
+	}
+	publicKey = parsedKey
+	return nil
+}
+
+func ensurePublicKey() error {
+	if publicKey != nil {
+		return nil
+	}
+	return tryLoadPublicKey()
+}
+
+func initTracking() {
+	if err := tryLoadPublicKey(); err != nil {
+		// Keep service alive for tests; handler will retry and log concrete failure.
+		log.Printf("Warning: %v", err)
 	}
 
 	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
@@ -56,7 +77,8 @@ func trackingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if publicKey == nil {
+	if err := ensurePublicKey(); err != nil {
+		log.Printf("Auth key unavailable for /ws: %v", err)
 		http.Error(w, "Server not configured for Auth", http.StatusInternalServerError)
 		return
 	}
