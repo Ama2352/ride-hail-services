@@ -24,11 +24,28 @@ var (
 	}
 )
 
+const (
+	defaultRedisAddrLocal = "localhost:6379"
+	defaultRedisAddrK8s   = "redis-master.redis.svc.cluster.local:6379"
+)
+
 func resolvePublicKeyPath() string {
 	if keyPath := os.Getenv("PUBLIC_KEY_PATH"); keyPath != "" {
 		return keyPath
 	}
 	return filepath.Join("..", ".keys", "public.pem")
+}
+
+func resolveRedisAddr() string {
+	if redisAddr := os.Getenv("REDIS_ADDR"); redisAddr != "" {
+		return redisAddr
+	}
+
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return defaultRedisAddrK8s
+	}
+
+	return defaultRedisAddrLocal
 }
 
 func tryLoadPublicKey() error {
@@ -58,16 +75,28 @@ func initTracking() {
 		log.Printf("Warning: %v", err)
 	}
 
-	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
+	redisAddr := resolveRedisAddr()
 	rdb = redis.NewClient(&redis.Options{
 		Addr: redisAddr,
 	})
-	log.Println("Tracking module initialized")
+	log.Printf("Tracking module initialized with Redis at %s", redisAddr)
 }
 
 type LocationUpdate struct {
 	Lat float64 `json:"lat"`
 	Lng float64 `json:"lng"`
+}
+
+func storeDriverLocation(ctx context.Context, userID string, loc LocationUpdate) error {
+	if rdb == nil {
+		return fmt.Errorf("redis client is not initialized")
+	}
+
+	return rdb.GeoAdd(ctx, "driver_locations", &redis.GeoLocation{
+		Name:      userID,
+		Longitude: loc.Lng,
+		Latitude:  loc.Lat,
+	}).Err()
 }
 
 func trackingHandler(w http.ResponseWriter, r *http.Request) {
@@ -121,10 +150,8 @@ func trackingHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctx := context.Background()
-		rdb.GeoAdd(ctx, "driver_locations", &redis.GeoLocation{
-			Name:      userID,
-			Longitude: loc.Lng,
-			Latitude:  loc.Lat,
-		})
+		if err := storeDriverLocation(ctx, userID, loc); err != nil {
+			log.Printf("Failed to store location for driver %s: %v", userID, err)
+		}
 	}
 }

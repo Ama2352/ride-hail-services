@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"net/http"
@@ -16,6 +17,46 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 )
+
+func TestResolveRedisAddr(t *testing.T) {
+	t.Run("UsesExplicitEnv", func(t *testing.T) {
+		t.Setenv("REDIS_ADDR", "redis.custom.svc:6380")
+		t.Setenv("KUBERNETES_SERVICE_HOST", "10.0.0.1")
+
+		if got := resolveRedisAddr(); got != "redis.custom.svc:6380" {
+			t.Fatalf("expected explicit REDIS_ADDR, got %q", got)
+		}
+	})
+
+	t.Run("UsesK8sDefaultWhenInCluster", func(t *testing.T) {
+		t.Setenv("REDIS_ADDR", "")
+		t.Setenv("KUBERNETES_SERVICE_HOST", "10.0.0.1")
+
+		if got := resolveRedisAddr(); got != defaultRedisAddrK8s {
+			t.Fatalf("expected k8s redis addr %q, got %q", defaultRedisAddrK8s, got)
+		}
+	})
+
+	t.Run("UsesLocalDefaultOutsideCluster", func(t *testing.T) {
+		t.Setenv("REDIS_ADDR", "")
+		t.Setenv("KUBERNETES_SERVICE_HOST", "")
+
+		if got := resolveRedisAddr(); got != defaultRedisAddrLocal {
+			t.Fatalf("expected local redis addr %q, got %q", defaultRedisAddrLocal, got)
+		}
+	})
+}
+
+func TestStoreDriverLocationRequiresInitializedClient(t *testing.T) {
+	original := rdb
+	rdb = nil
+	t.Cleanup(func() { rdb = original })
+
+	err := storeDriverLocation(context.Background(), "drv-123", LocationUpdate{Lat: 10.0, Lng: 106.0})
+	if err == nil {
+		t.Fatal("expected error when redis client is nil")
+	}
+}
 
 func TestInitTracking_Errors(t *testing.T) {
 	keyPath := filepath.Join("..", ".keys", "public.pem")
