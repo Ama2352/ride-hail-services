@@ -9,6 +9,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o user-service .
 
 FROM alpine:3.18
 
+RUN apk --no-cache upgrade
+
 WORKDIR /app
 COPY --from=builder /app/user-service .
 

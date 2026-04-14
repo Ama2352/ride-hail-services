@@ -22,7 +22,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o dispatch-service .
 FROM alpine:3.20
 
 # Security: Run as non-root user
-RUN addgroup -g 1000 appgroup && \
+RUN apk --no-cache upgrade && \
+    addgroup -g 1000 appgroup && \
     adduser -u 1000 -G appgroup -D appuser
 
 WORKDIR /app
