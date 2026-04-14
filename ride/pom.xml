@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>Ride Service</name>
-    <description>Trip Lifecycle Management & Event Publishing for Ride-Hailing Platform</description>
+    <description>Trip Lifecycle Management &amp; Event Publishing for Ride-Hailing Platform</description>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
