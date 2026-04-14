@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // TestHealthEndpoint tests the /health endpoint
@@ -16,10 +18,14 @@ func TestHealthEndpoint(t *testing.T) {
 		Version:     "1.0.0",
 	}
 
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 
-	mux := setupRouter(config)
+	mux := setupRouter(config, rdb)
 	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -48,10 +54,14 @@ func TestMetricsEndpoint(t *testing.T) {
 		Version:     "1.0.0",
 	}
 
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	w := httptest.NewRecorder()
 
-	mux := setupRouter(config)
+	mux := setupRouter(config, rdb)
 	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -77,7 +87,11 @@ func TestMetricsMiddleware(t *testing.T) {
 		Version:     "1.0.0",
 	}
 
-	mux := setupRouter(config)
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	mux := setupRouter(config, rdb)
 	handler := metricsMiddleware(mux)
 
 	// Make request through middleware

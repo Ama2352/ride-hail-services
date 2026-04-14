@@ -1,0 +1,83 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.app-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px 20px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.app-title {
+  font-size: 48px;
+  margin-bottom: 10px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.app-subtitle {
+  font-size: 18px;
+  opacity: 0.95;
+  font-weight: 300;
+}
+
+.app-main {
+  flex: 1;
+  padding: 40px 20px;
+}
+
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.new-ride-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 16px;
+  background-color: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.new-ride-btn:hover {
+  background-color: #5568d3;
+}
+
+.app-footer {
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  text-align: center;
+  padding: 20px;
+  font-size: 14px;
+  margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .app-title {
+    font-size: 36px;
+  }
+
+  .app-subtitle {
+    font-size: 16px;
+  }
+
+  .app-main {
+    padding: 20px 10px;
+  }
+}

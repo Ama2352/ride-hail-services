@@ -1,14 +1,20 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 )
 
 // Config holds service configuration
@@ -52,6 +58,24 @@ var (
 	metricsOnce sync.Once
 )
 
+// Global stream consumer and connection manager
+var (
+	streamConsumer   *StreamConsumer
+	connManager      *ConnectionManager
+	ctx              context.Context
+	cancel           context.CancelFunc
+)
+
+// WebSocket upgrader configuration
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// In production, validate the Origin header
+		return true
+	},
+}
+
 func init() {
 	registerMetrics()
 }
@@ -80,6 +104,15 @@ func (w *statusWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
+// Hijack forwards websocket/connection upgrade support when available.
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("response does not implement http.Hijacker")
+	}
+	return hijacker.Hijack()
+}
+
 // metricsMiddleware instruments HTTP requests with Prometheus metrics
 func metricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,13 +136,26 @@ func metricsMiddleware(next http.Handler) http.Handler {
 }
 
 // setupRouter creates and configures the HTTP router
-func setupRouter(config Config) *http.ServeMux {
+func setupRouter(config Config, rdb *redis.Client) *http.ServeMux {
 	mux := http.NewServeMux()
+
+	// Initialize connection manager and stream consumer
+	connManager = NewConnectionManager()
+	streamConsumer = NewStreamConsumer(rdb, connManager)
+
+	// Create context for consumer lifecycle
+	ctx, cancel = context.WithCancel(context.Background())
+
+	// Start stream consumer in background
+	go streamConsumer.StartConsuming(ctx)
+
+	// Start connection manager
+	connManager.Start()
 
 	// Prometheus metrics endpoint (required for monitoring)
 	mux.Handle("/metrics", promhttp.Handler())
 
-	// Health check endpoint (main application endpoint)
+	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		response := HealthResponse{
 			Status:    "healthy",
@@ -120,6 +166,20 @@ func setupRouter(config Config) *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
+	})
+
+	// WebSocket endpoint for notifications
+	mux.HandleFunc("/notifications", websocketHandler)
+
+	// Stats endpoint (for monitoring)
+	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		stats := map[string]interface{}{
+			"connected_clients": connManager.GetConnectionCount(),
+			"timestamp":         time.Now().UTC().Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(stats)
 	})
 
 	return mux
