@@ -1,4 +1,4 @@
-package test.java.com.ridehailing.ride.service;
+package com.ridehailing.ride.service;
 
 import com.ridehailing.ride.dto.CreateRideRequest;
 import com.ridehailing.ride.dto.RideResponse;
