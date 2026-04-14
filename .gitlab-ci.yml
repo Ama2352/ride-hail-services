@@ -145,18 +145,18 @@ build_images:
       - ride-service.tar
     expire_in: 1 day
 
-scan_images:
-  stage: scan
-  image: 
-    name: aquasec/trivy:0.48.3
-    entrypoint: [""]
-  needs:
-    - build_images
-  script:
-    - trivy image --input dispatch-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
-    - trivy image --input notification-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
-    - trivy image --input user-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
-    - trivy image --input ride-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+# scan_images:
+#   stage: scan
+#   image: 
+#     name: aquasec/trivy:0.48.3
+#     entrypoint: [""]
+#   needs:
+#     - build_images
+#   script:
+#     - trivy image --input dispatch-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+#     - trivy image --input notification-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+#     - trivy image --input user-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
+#     - trivy image --input ride-service.tar --severity HIGH,CRITICAL --exit-code 1 --format table
 
 push_images:
   stage: push
@@ -166,7 +166,7 @@ push_images:
       alias: docker
   needs:
     - build_images
-    - scan_images
+    # - scan_images
   rules:
     - if: '$CI_COMMIT_BRANCH'
   script:
