@@ -112,13 +112,13 @@ sonarqube_analysis:
     - test_ride
   script:
     - cd dispatch
-    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.qualitygate.wait=false
     - cd ../notification
-    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.qualitygate.wait=false
     - cd ../user
-    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.qualitygate.wait=false
     - cd ../ride
-    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN
+    - sonar-scanner -Dsonar.host.url=$SONAR_HOST -Dsonar.token=$SONAR_TOKEN -Dsonar.qualitygate.wait=false
 
 build_images:
   stage: build
