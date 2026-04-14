@@ -66,7 +66,7 @@ public class RideEventPublisher {
     public void publishRideRequested(Long rideId, String passengerId, Double pickupLat, Double pickupLng,
             Double dropoffLat, Double dropoffLng) {
         RideEvent event = new RideEvent("Ride.Requested", rideId, passengerId, null,
-                pickupLat, pickupLng, dropoffLat, dropoffLng);
+                pickupLat, pickupLng, dropoffLat, dropoffLng, LocalDateTime.now());
         publishEvent("Ride.Requested", event);
     }
 
@@ -77,7 +77,7 @@ public class RideEventPublisher {
             Double pickupLat, Double pickupLng,
             Double dropoffLat, Double dropoffLng) {
         RideEvent event = new RideEvent("Ride.Assigned", rideId, passengerId, driverId,
-                pickupLat, pickupLng, dropoffLat, dropoffLng);
+                pickupLat, pickupLng, dropoffLat, dropoffLng, LocalDateTime.now());
         publishEvent("Ride.Assigned", event);
     }
 
@@ -88,7 +88,7 @@ public class RideEventPublisher {
             Double pickupLat, Double pickupLng,
             Double dropoffLat, Double dropoffLng) {
         RideEvent event = new RideEvent("Ride.Started", rideId, passengerId, driverId,
-                pickupLat, pickupLng, dropoffLat, dropoffLng);
+                pickupLat, pickupLng, dropoffLat, dropoffLng, LocalDateTime.now());
         publishEvent("Ride.Started", event);
     }
 
@@ -99,7 +99,7 @@ public class RideEventPublisher {
             Double pickupLat, Double pickupLng,
             Double dropoffLat, Double dropoffLng) {
         RideEvent event = new RideEvent("Ride.Completed", rideId, passengerId, driverId,
-                pickupLat, pickupLng, dropoffLat, dropoffLng);
+                pickupLat, pickupLng, dropoffLat, dropoffLng, LocalDateTime.now());
         publishEvent("Ride.Completed", event);
     }
 
@@ -110,7 +110,7 @@ public class RideEventPublisher {
             Double pickupLat, Double pickupLng,
             Double dropoffLat, Double dropoffLng) {
         RideEvent event = new RideEvent("Ride.Cancelled", rideId, passengerId, driverId,
-                pickupLat, pickupLng, dropoffLat, dropoffLng);
+                pickupLat, pickupLng, dropoffLat, dropoffLng, LocalDateTime.now());
         publishEvent("Ride.Cancelled", event);
     }
 }
