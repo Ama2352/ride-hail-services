@@ -86,6 +86,7 @@ test_ride:
   artifacts:
     when: always
     paths:
+      - ride/target/classes/
       - ride/target/site/jacoco/jacoco.xml
       - ride/target/surefire-reports/
     expire_in: 1 day
