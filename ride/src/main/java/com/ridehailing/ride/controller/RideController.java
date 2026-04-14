@@ -1,4 +1,4 @@
-package main.java.com.ridehailing.ride.controller;
+package com.ridehailing.ride.controller;
 
 import com.ridehailing.ride.dto.CreateRideRequest;
 import com.ridehailing.ride.dto.RideResponse;
