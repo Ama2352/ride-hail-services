@@ -25,7 +25,7 @@ func main() {
 
 	// Initialize Redis client
 	rdb := redis.NewClient(&redis.Options{
-		Addr: getEnv("REDIS_URL", "localhost:6379"),
+		Addr: resolveMainRedisAddr(),
 	})
 
 	mux := setupRouter(config, rdb)
@@ -51,4 +51,11 @@ func main() {
 	if err := http.ListenAndServe(":"+config.Port, handler); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func resolveMainRedisAddr() string {
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		return addr
+	}
+	return getEnv("REDIS_URL", "localhost:6379")
 }
