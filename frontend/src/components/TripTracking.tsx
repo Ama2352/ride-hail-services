@@ -35,7 +35,6 @@ export const TripTracking: React.FC<TripTrackingProps> = ({ rideId, onTripComple
 
   const handleRateTrip = async () => {
     if (!trip) return;
-
     try {
       await apiClient.rateTripAndFeedback(trip.tripId, rating, feedback);
       alert('Thank you for your feedback!');
@@ -46,96 +45,83 @@ export const TripTracking: React.FC<TripTrackingProps> = ({ rideId, onTripComple
   };
 
   if (loading) {
-    return <div className="trip-tracking loading">Loading trip details...</div>;
+    return <div className="bottom-sheet loading">Loading tracking details...</div>;
   }
 
   if (error || !trip) {
-    return <div className="trip-tracking error">{error || 'Trip details not found'}</div>;
+    return <div className="bottom-sheet error">{error || 'Trip details not found'}</div>;
   }
 
   const isCompleted = trip.status === 'completed';
 
   return (
-    <div className="trip-tracking">
-      <div className="trip-header">
-        <h2>Trip Details</h2>
-        <span className={`status-badge ${trip.status}`}>{trip.status.replace(/_/g, ' ')}</span>
-      </div>
-
-      <div className="driver-info">
-        <h3>Driver Information</h3>
-        <div className="driver-details">
-          <div className="driver-name">{trip.driver.name}</div>
-          <div className="driver-rating">⭐ {trip.driver.rating.toFixed(1)}</div>
-          <div className="vehicle-plate">{trip.driver.vehiclePlate}</div>
-        </div>
-      </div>
-
-      <div className="trip-info">
-        <h3>Trip Progress</h3>
-        <div className="location-info">
-          <div className="location-item">
-            <span className="label">Pickup:</span>
-            <span className="coords">
-              {trip.pickupLocation.latitude.toFixed(4)}, {trip.pickupLocation.longitude.toFixed(4)}
-            </span>
-          </div>
-          <div className="location-item">
-            <span className="label">Current:</span>
-            <span className="coords">
-              {trip.currentLocation.latitude.toFixed(4)}, {trip.currentLocation.longitude.toFixed(4)}
-            </span>
-          </div>
-          <div className="location-item">
-            <span className="label">Dropoff:</span>
-            <span className="coords">
-              {trip.dropoffLocation.latitude.toFixed(4)}, {trip.dropoffLocation.longitude.toFixed(4)}
-            </span>
-          </div>
-        </div>
-
+    <div className="bottom-sheet">
+      <div className="bottom-sheet-handle"></div>
+      
+      <div className="trip-status-header">
+        <h2 className="sheet-title">
+          {isCompleted ? 'You have arrived' : trip.status === 'in_progress' ? 'Heading to destination' : 'Driver is on the way'}
+        </h2>
         {trip.status !== 'completed' && (
-          <div className="eta-info">
-            <span className="label">Estimated Arrival:</span>
-            <span className="time">{Math.ceil(trip.estimatedArrivalTime / 60)} min</span>
-          </div>
+          <div className="eta-badge">{Math.ceil(trip.estimatedArrivalTime / 60)} min</div>
         )}
+      </div>
 
-        <div className="fare-info">
-          <span className="label">Fare:</span>
-          <span className="amount">
-            {trip.fare.currency} {trip.fare.amount.toFixed(2)}
-          </span>
+      <div className="driver-card">
+        <div className="driver-avatar">
+          <img src={`https://ui-avatars.com/api/?name=${trip.driver.name}&background=0D8ABC&color=fff`} alt="Driver" />
+        </div>
+        <div className="driver-details">
+          <h4>{trip.driver.name}</h4>
+          <span className="driver-rating">⭐ {trip.driver.rating.toFixed(1)}</span>
+        </div>
+        <div className="vehicle-plate">{trip.driver.vehiclePlate}</div>
+      </div>
+
+      <div className="trip-info-card">
+        <div className="location-inputs">
+          <div className="location-track">
+            <div className="dot-green"></div>
+            <div className="line-vertical"></div>
+            <div className="dot-red"></div>
+          </div>
+          <div className="inputs-wrapper">
+             <div className="info-text">Pickup Location</div>
+             <div className="divider"></div>
+             <div className="info-text font-bold">Destination</div>
+          </div>
         </div>
       </div>
 
-      {isCompleted && (
+      {isCompleted ? (
         <div className="feedback-section">
-          <h3>Rate Your Trip</h3>
-          <div className="rating-input">
-            <div className="star-rating">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  className={`star ${rating >= star ? 'filled' : ''}`}
-                  onClick={() => setRating(star)}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
+          <h3>Rate your trip</h3>
+          <div className="star-rating">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                className={`star ${rating >= star ? 'filled' : ''}`}
+                onClick={() => setRating(star)}
+              >
+                ★
+              </button>
+            ))}
           </div>
           <textarea
             className="feedback-textarea"
-            placeholder="How was your ride? (Optional)"
+            placeholder="Add a comment (Optional)"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            rows={3}
+            rows={2}
           />
-          <button className="submit-feedback-btn" onClick={handleRateTrip} disabled={rating === 0}>
-            Submit Feedback
+          <button className="grab-primary-btn" onClick={handleRateTrip} disabled={rating === 0}>
+            Submit & Complete
           </button>
         </div>
+      ) : (
+         <button className="grab-secondary-btn" onClick={onTripComplete}>
+            (Demo) Finish Booking Flow
+         </button>
       )}
     </div>
   );

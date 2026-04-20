@@ -1,83 +1,130 @@
-.app {
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+}
+
+.app-container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  background: #f3f4f6;
 }
 
 .app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 30px 20px;
-  text-align: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* background: linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(255,255,255,0)); */
+  background: transparent;
+  pointer-events: none;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  pointer-events: auto;
 }
 
-.header-content {
-  max-width: 1200px;
-  margin: 0 auto;
+.logo-dot {
+  width: 12px;
+  height: 12px;
+  background: #00B14F;
+  border-radius: 50%;
 }
 
-.app-title {
-  font-size: 48px;
-  margin-bottom: 10px;
+.logo-text {
   font-weight: 700;
-  letter-spacing: -1px;
+  font-size: 1.25rem;
+  color: #1a1a1a;
+  letter-spacing: -0.5px;
 }
 
-.app-subtitle {
-  font-size: 18px;
-  opacity: 0.95;
-  font-weight: 300;
+.profile-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  pointer-events: auto;
+}
+
+.profile-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .app-main {
   flex: 1;
-  padding: 40px 20px;
-}
-
-.container {
-  max-width: 500px;
-  margin: 0 auto;
-}
-
-.new-ride-btn {
+  position: relative;
+  height: 100%;
   width: 100%;
-  padding: 12px;
-  margin-top: 16px;
-  background-color: #667eea;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
 }
 
-.new-ride-btn:hover {
-  background-color: #5568d3;
+.map-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
 }
 
-.app-footer {
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  text-align: center;
-  padding: 20px;
-  font-size: 14px;
-  margin-top: auto;
+/* Bottom Sheet */
+.bottom-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 24px;
+  z-index: 1000;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  max-height: 80vh;
+  overflow-y: auto;
+  transition: transform 0.3s ease-out;
 }
 
-@media (max-width: 768px) {
-  .app-title {
-    font-size: 36px;
+.bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+@media (min-width: 768px) {
+  .bottom-sheet {
+    bottom: 24px;
+    left: 24px;
+    right: auto;
+    width: 400px;
+    border-radius: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   }
-
-  .app-subtitle {
-    font-size: 16px;
-  }
-
-  .app-main {
-    padding: 20px 10px;
+  
+  .bottom-sheet-handle {
+    display: none;
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import type { RideRequest } from '../types';
+import { Map, MapPin, Navigation, Car, Sparkles } from 'lucide-react';
 import './RideRequestForm.css';
 
 interface RideRequestFormProps {
@@ -8,10 +9,10 @@ interface RideRequestFormProps {
 }
 
 export const RideRequestForm: React.FC<RideRequestFormProps> = ({ onRequestSubmitted }) => {
-  const [pickupLat, setPickupLat] = useState('40.7128');
-  const [pickupLng, setPickupLng] = useState('-74.0060');
-  const [dropoffLat, setDropoffLat] = useState('40.7580');
-  const [dropoffLng, setDropoffLng] = useState('-73.9855');
+  const [pickupLat, setPickupLat] = useState('10.762622');
+  const [pickupLng, setPickupLng] = useState('106.660172');
+  const [dropoffLat, setDropoffLat] = useState('10.771511');
+  const [dropoffLng, setDropoffLng] = useState('106.698387');
   const [rideType, setRideType] = useState<'economy' | 'premium'>('economy');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,11 +32,6 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({ onRequestSubmi
           rideType
         );
         onRequestSubmitted(ride);
-        // Reset form
-        setPickupLat('40.7128');
-        setPickupLng('-74.0060');
-        setDropoffLat('40.7580');
-        setDropoffLng('-73.9855');
       } catch (err: any) {
         setError(err.response?.data?.message || 'Failed to request ride. Please try again.');
       } finally {
@@ -46,100 +42,75 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({ onRequestSubmi
   );
 
   return (
-    <form className="ride-request-form" onSubmit={handleSubmit}>
-      <h2>Book Your Ride</h2>
+    <div className="bottom-sheet">
+      <div className="bottom-sheet-handle"></div>
+      <h2 className="sheet-title">Where to?</h2>
 
-      <div className="form-section">
-        <h3>Pickup Location</h3>
-        <div className="form-group">
-          <label htmlFor="pickup-lat">Latitude</label>
-          <input
-            id="pickup-lat"
-            type="number"
-            step="0.0001"
-            value={pickupLat}
-            onChange={(e) => setPickupLat(e.target.value)}
-            placeholder="40.7128"
-            required
-            disabled={isLoading}
-          />
+      <form className="ride-form" onSubmit={handleSubmit}>
+        <div className="location-inputs">
+          <div className="location-track">
+            <div className="dot-green"></div>
+            <div className="line-vertical"></div>
+            <div className="dot-red"></div>
+          </div>
+          
+          <div className="inputs-wrapper">
+            <div className="input-group">
+              <input
+                type="text"
+                value={`${pickupLat}, ${pickupLng}`}
+                onChange={() => {}}
+                placeholder="Current Location"
+                readOnly
+                className="location-input"
+              />
+            </div>
+            <div className="divider"></div>
+            <div className="input-group">
+              <input
+                type="text"
+                value={`${dropoffLat}, ${dropoffLng}`}
+                onChange={() => {}}
+                placeholder="Destination"
+                readOnly
+                className="location-input destination-input"
+              />
+            </div>
+          </div>
         </div>
-        <div className="form-group">
-          <label htmlFor="pickup-lng">Longitude</label>
-          <input
-            id="pickup-lng"
-            type="number"
-            step="0.0001"
-            value={pickupLng}
-            onChange={(e) => setPickupLng(e.target.value)}
-            placeholder="-74.0060"
-            required
-            disabled={isLoading}
-          />
-        </div>
-      </div>
 
-      <div className="form-section">
-        <h3>Dropoff Location</h3>
-        <div className="form-group">
-          <label htmlFor="dropoff-lat">Latitude</label>
-          <input
-            id="dropoff-lat"
-            type="number"
-            step="0.0001"
-            value={dropoffLat}
-            onChange={(e) => setDropoffLat(e.target.value)}
-            placeholder="40.7580"
-            required
-            disabled={isLoading}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="dropoff-lng">Longitude</label>
-          <input
-            id="dropoff-lng"
-            type="number"
-            step="0.0001"
-            value={dropoffLng}
-            onChange={(e) => setDropoffLng(e.target.value)}
-            placeholder="-73.9855"
-            required
-            disabled={isLoading}
-          />
-        </div>
-      </div>
+        <div className="ride-options">
+          <div 
+            className={`ride-option ${rideType === 'economy' ? 'active' : ''}`}
+            onClick={() => setRideType('economy')}
+          >
+            <div className="option-icon"><Car size={24} /></div>
+            <div className="option-details">
+              <h4>Economy</h4>
+              <p>Affordable, everyday rides</p>
+            </div>
+            <div className="option-price">~ $5.00</div>
+          </div>
 
-      <div className="form-section">
-        <h3>Ride Type</h3>
-        <div className="ride-type-select">
-          <label>
-            <input
-              type="radio"
-              value="economy"
-              checked={rideType === 'economy'}
-              onChange={(e) => setRideType(e.target.value as 'economy' | 'premium')}
-              disabled={isLoading}
-            />
-            <span>Economy - Affordable & Reliable</span>
-          </label>
-          <label>
-            <input
-              type="radio"
-              value="premium"
-              checked={rideType === 'premium'}
-              onChange={(e) => setRideType(e.target.value as 'economy' | 'premium')}
-              disabled={isLoading}
-            />
-            <span>Premium - Comfort & Quality</span>
-          </label>
+          <div 
+            className={`ride-option ${rideType === 'premium' ? 'active' : ''}`}
+            onClick={() => setRideType('premium')}
+          >
+            <div className="option-icon premium"><Sparkles size={24} /></div>
+            <div className="option-details">
+              <h4>Premium</h4>
+              <p>Comfort and extra space</p>
+            </div>
+            <div className="option-price">~ $8.50</div>
+          </div>
         </div>
-      </div>
 
-      {error && <div className="error-message">{error}</div>}
+        {error && <div className="error-message">{error}</div>}
 
-      <button type="submit" disabled={isLoading} className="submit-btn">
-        {isLoading ? 'Requesting Ride...' : 'Request Ride'}
-      </button>
-    </form>
+        <button type="submit" disabled={isLoading} className="submit-btn grab-primary-btn">
+          {isLoading ? 'Finding driver...' : 'Book Ride'}
+        </button>
+      </form>
+    </div>
   );
 };

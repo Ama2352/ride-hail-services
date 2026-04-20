@@ -28,5 +28,8 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 # Expose port
 EXPOSE 8082
 
-# Run application
-ENTRYPOINT ["java", "-XX:+UseG1GC", "-XX:MaxRAMPercentage=75.0", "-jar", "ride-service.jar"]
+# Run application with optimized JVM args for low-resource environment (3GB RAM Node)
+# -Xms256m: Start with 256MB heap
+# -Xmx512m: Cap heap at 512MB to leave room for OS and other pods
+# -XX:+ExitOnOutOfMemoryError: Ensure Pod restarts if it hits OOM instead of hanging the node
+ENTRYPOINT ["java", "-Xms256m", "-Xmx512m", "-XX:+UseG1GC", "-XX:+ExitOnOutOfMemoryError", "-jar", "ride-service.jar"]
