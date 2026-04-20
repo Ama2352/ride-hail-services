@@ -4,11 +4,15 @@
   "description": "Rider-facing frontend for ride-hailing platform",
   "private": true,
   "dependencies": {
+    "@types/leaflet": "^1.9.21",
+    "axios": "^1.6.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.8.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-leaflet": "^5.0.0",
     "react-scripts": "5.0.1",
-    "typescript": "^4.9.5",
-    "axios": "^1.6.0"
+    "typescript": "^4.9.5"
   },
   "devDependencies": {
     "@types/node": "^18.11.0",
