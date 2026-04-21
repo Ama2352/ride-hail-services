@@ -332,7 +332,13 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        set -e
+                        set -euxo pipefail
+                        trap 'echo "Push Images failed at line ${LINENO}"' ERR
+
+                        echo "=== Docker preflight ==="
+                        docker version
+                        docker info >/dev/null
+
                         echo "=== Authenticating with Docker registry ==="
                         echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
 
