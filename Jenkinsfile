@@ -264,6 +264,7 @@ pipeline {
                     }
                 }
 
+/*
                 stage('Scan Images') {
                     agent {
                         docker {
@@ -320,6 +321,7 @@ pipeline {
                         }
                     }
                 }
+*/
 
                 stage('Push Images') {
                     agent {
@@ -373,10 +375,12 @@ pipeline {
         // ArgoCD detects the commit and reconciles the cluster.
         // Only runs on the main branch — not on PRs or feature branches.
         stage('GitOps Update') {
-            when { branch 'main' }
             agent { label 'built-in' }
 
             steps {
+                echo "=== Starting GitOps Update Stage ==="
+                echo "Current Branch (BRANCH_NAME): ${env.BRANCH_NAME}"
+                echo "Current Branch (GIT_BRANCH): ${env.GIT_BRANCH}"
                 withCredentials([usernamePassword(
                     credentialsId: 'gitops-repo-credentials',
                     usernameVariable: 'GIT_USER',
