@@ -196,10 +196,21 @@ pipeline {
                                     cd dispatch
                                     sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
                                     echo "=== [dispatch] SonarQube analysis submitted ==="
+
                                     echo "=== [notification] Running SonarQube analysis ==="
                                     cd ../notification
                                     sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
                                     echo "=== [notification] SonarQube analysis submitted ==="
+
+                                    echo "=== [user] Running SonarQube analysis ==="
+                                    cd ../user
+                                    sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
+                                    echo "=== [user] SonarQube analysis submitted ==="
+
+                                    echo "=== [ride] Running SonarQube analysis ==="
+                                    cd ../ride
+                                    sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
+                                    echo "=== [ride] SonarQube analysis submitted ==="
                                 '''
                             }
                         }
@@ -233,12 +244,20 @@ pipeline {
                             set -e
                             echo "=== [dispatch] Building Docker image: dispatch-service:${IMAGE_TAG} ==="
                             docker build -t dispatch-service:${IMAGE_TAG}     dispatch
-                            echo "=== [dispatch] Saving image to tar for scanning ==="
                             docker save  dispatch-service:${IMAGE_TAG}     -o dispatch-service.tar
+
                             echo "=== [notification] Building Docker image: notification-service:${IMAGE_TAG} ==="
                             docker build -t notification-service:${IMAGE_TAG} notification
-                            echo "=== [notification] Saving image to tar for scanning ==="
                             docker save  notification-service:${IMAGE_TAG} -o notification-service.tar
+
+                            echo "=== [user] Building Docker image: user-service:${IMAGE_TAG} ==="
+                            docker build -t user-service:${IMAGE_TAG} user
+                            docker save  user-service:${IMAGE_TAG} -o user-service.tar
+
+                            echo "=== [ride] Building Docker image: ride-service:${IMAGE_TAG} ==="
+                            docker build -t ride-service:${IMAGE_TAG} ride
+                            docker save  ride-service:${IMAGE_TAG} -o ride-service.tar
+
                             echo "=== Image tars ready for security scan ==="
                             ls -lh *.tar
                         '''
@@ -266,10 +285,22 @@ pipeline {
                                 trivy image --input dispatch-service.tar \
                                     --severity HIGH,CRITICAL --exit-code 1 --format table \
                                     || echo "Vulnerabilities found in dispatch-service"
+                                
                                 echo "=== [notification] Scanning for HIGH/CRITICAL CVEs ==="
                                 trivy image --input notification-service.tar \
                                     --severity HIGH,CRITICAL --exit-code 1 --format table \
                                     || echo "Vulnerabilities found in notification-service"
+
+                                echo "=== [user] Scanning for HIGH/CRITICAL CVEs ==="
+                                trivy image --input user-service.tar \
+                                    --severity HIGH,CRITICAL --exit-code 1 --format table \
+                                    || echo "Vulnerabilities found in user-service"
+
+                                echo "=== [ride] Scanning for HIGH/CRITICAL CVEs ==="
+                                trivy image --input ride-service.tar \
+                                    --severity HIGH,CRITICAL --exit-code 1 --format table \
+                                    || echo "Vulnerabilities found in ride-service"
+
                                 echo "=== Security scan complete (results recorded above) ==="
                             '''
                         }
@@ -309,25 +340,26 @@ pipeline {
                                 echo "=== Authenticating with Docker registry ==="
                                 echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
 
-                                echo "=== [dispatch] Tagging and pushing to ${DOCKER_REGISTRY} ==="
+                                echo "=== [dispatch] Tagging and pushing ==="
+                                docker load -i dispatch-service.tar
                                 docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
-                                docker tag dispatch-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/dispatch-service:latest
                                 docker push ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG}
-                                docker push ${DOCKER_REGISTRY}/dispatch-service:latest
 
-                                echo "=== [notification] Tagging and pushing to ${DOCKER_REGISTRY} ==="
+                                echo "=== [notification] Tagging and pushing ==="
+                                docker load -i notification-service.tar
                                 docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
-                                docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:latest
                                 docker push ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
-                                docker push ${DOCKER_REGISTRY}/notification-service:latest
 
-                                echo "=== Cleaning up local images to free disk space ==="
-                                docker rmi dispatch-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/dispatch-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/dispatch-service:latest || true
-                                docker rmi notification-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG} \
-                                           ${DOCKER_REGISTRY}/notification-service:latest || true
+                                echo "=== [user] Tagging and pushing ==="
+                                docker load -i user-service.tar
+                                docker tag user-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+                                docker push ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+
+                                echo "=== [ride] Tagging and pushing ==="
+                                docker load -i ride-service.tar
+                                docker tag ride-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/ride-service:${IMAGE_TAG}
+                                docker push ${DOCKER_REGISTRY}/ride-service:${IMAGE_TAG}
+
                                 echo "=== All images pushed successfully ==="
                             '''
                         }
@@ -358,30 +390,21 @@ pipeline {
                         git clone --branch "${GITOPS_BRANCH}" --depth 1 "${GITOPS_URL}" gitops-workspace
                         cd gitops-workspace
 
-                        # Update the Kustomize overlay newTag — this is the ONLY line ArgoCD needs.
-                        # The base k8s.yaml image name stays constant; only the tag changes.
-                        echo "=== Updating dispatch dev overlay image tag ==="
-                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" \
-                            apps/dispatch/overlays/dev/kustomization.yaml
-                        echo "    apps/dispatch/overlays/dev/kustomization.yaml → newTag: ${IMAGE_TAG}"
-
-                        echo "=== Updating notification dev overlay image tag ==="
-                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" \
-                            apps/notification/overlays/dev/kustomization.yaml
-                        echo "    apps/notification/overlays/dev/kustomization.yaml → newTag: ${IMAGE_TAG}"
+                        # Update all service overlays
+                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/dispatch/overlays/dev/kustomization.yaml
+                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/notification/overlays/dev/kustomization.yaml
+                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/user/overlays/dev/kustomization.yaml
+                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/ride/overlays/dev/kustomization.yaml
 
                         echo "=== Committing and pushing to GitOps repo ==="
                         git config user.email "jenkins@ride-hail.ci"
                         git config user.name "Jenkins CI"
-                        git add -A
+                        git add .
                         git diff --cached --quiet && {
                             echo "No manifest changes detected — nothing to commit."
                             exit 0
                         }
-                        MSG=$(printf 'ci: update image tags to %s\n\nTriggered by ride-hail-services build #%s\nCommit: %s\nImages:\n  - %s/dispatch-service:%s\n  - %s/notification-service:%s' \
-                            "${IMAGE_TAG}" "${BUILD_NUMBER}" "${GIT_COMMIT}" \
-                            "${DOCKER_REGISTRY}" "${IMAGE_TAG}" \
-                            "${DOCKER_REGISTRY}" "${IMAGE_TAG}")
+                        MSG=$(printf 'ci: update all service tags to %s\n\nTriggered by Jenkins build #%s' "${IMAGE_TAG}" "${BUILD_NUMBER}")
                         git commit -m "$MSG"
                         git push origin "${GITOPS_BRANCH}"
                         echo "=== GitOps repo updated — ArgoCD will reconcile ==="
