@@ -152,11 +152,12 @@ func setupRouter(config Config, rdb *redis.Client) *http.ServeMux {
 	// Start connection manager
 	connManager.Start()
 
-	// Prometheus metrics endpoint (required for monitoring)
+	// Prometheus metrics endpoint (legacy + namespaced)
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/notification/metrics", promhttp.Handler())
 
-	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	// Health check endpoint handler (shared by legacy + namespaced routes)
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
 		response := HealthResponse{
 			Status:    "healthy",
 			Service:   config.ServiceName,
@@ -166,13 +167,17 @@ func setupRouter(config Config, rdb *redis.Client) *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
-	})
+	}
+	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/notification/health", healthHandler)
 
-	// WebSocket endpoint for notifications
+	// WebSocket endpoint for notifications (legacy + namespaced)
 	mux.HandleFunc("/notifications", websocketHandler)
+	mux.HandleFunc("/notification/notifications", websocketHandler)
+	mux.HandleFunc("/notification/ws", websocketHandler)
 
-	// Stats endpoint (for monitoring)
-	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+	// Stats endpoint handler (shared by legacy + namespaced routes)
+	statsHandler := func(w http.ResponseWriter, r *http.Request) {
 		stats := map[string]interface{}{
 			"connected_clients": connManager.GetConnectionCount(),
 			"timestamp":         time.Now().UTC().Format(time.RFC3339),
@@ -180,7 +185,9 @@ func setupRouter(config Config, rdb *redis.Client) *http.ServeMux {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(stats)
-	})
+	}
+	mux.HandleFunc("/stats", statsHandler)
+	mux.HandleFunc("/notification/stats", statsHandler)
 
 	return mux
 }

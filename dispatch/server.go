@@ -138,11 +138,12 @@ func setupRouter(config Config, rdb *redis.Client) *http.ServeMux {
 	ctx, cancel = context.WithCancel(context.Background())
 	go streamConsumer.StartConsuming(ctx)
 
-	// Prometheus metrics endpoint (required for monitoring)
+	// Prometheus metrics endpoint (legacy + namespaced)
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/dispatch/metrics", promhttp.Handler())
 
-	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	// Health check endpoint handler (shared by legacy + namespaced routes)
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
 		response := HealthResponse{
 			Status:    "healthy",
 			Service:   config.ServiceName,
@@ -152,10 +153,13 @@ func setupRouter(config Config, rdb *redis.Client) *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
-	})
+	}
+	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/dispatch/health", healthHandler)
 
-	// GPS tracking WebSocket endpoint
+	// GPS tracking WebSocket endpoint (legacy + namespaced)
 	mux.HandleFunc("/ws", trackingHandler)
+	mux.HandleFunc("/dispatch/ws", trackingHandler)
 
 	// Dispatch status endpoints (for demo/monitoring)
 	mux.HandleFunc("/dispatch/active", func(w http.ResponseWriter, r *http.Request) {

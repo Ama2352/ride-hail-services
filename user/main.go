@@ -71,8 +71,23 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "healthy",
+		"service": "user-service",
+	})
+}
+
 func main() {
 	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/user/login", loginHandler)
+	http.HandleFunc("/user/health", healthHandler)
 	log.Println("Starting user service on :8081")
 	if err := http.ListenAndServe(":8081", nil); err != nil {
 		log.Fatal(err)
