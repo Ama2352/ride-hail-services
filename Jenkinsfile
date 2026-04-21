@@ -24,6 +24,7 @@ pipeline {
     }
 
     options {
+        ansiColor('xterm')
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '10'))
@@ -32,6 +33,7 @@ pipeline {
     stages {
 
         stage('Checkout') {
+            agent { label 'built-in' }
             steps {
                 echo "Checking out source code from SCM..."
                 checkout scm
