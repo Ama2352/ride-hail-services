@@ -14,7 +14,7 @@
 // =============================================================================
 
 pipeline {
-    agent none
+    agent any
 
     environment {
         DOCKER_REGISTRY   = "docker.io/ama2352"
@@ -24,7 +24,6 @@ pipeline {
     }
 
     options {
-        ansiColor('xterm')
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '10'))
@@ -33,7 +32,6 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            agent { label 'built-in' }
             steps {
                 echo "Checking out source code from SCM..."
                 checkout scm
@@ -368,8 +366,6 @@ pipeline {
         // ArgoCD detects the commit and reconciles the cluster.
         // Only runs on the main branch — not on PRs or feature branches.
         stage('GitOps Update') {
-            agent { label 'built-in' }
-
             steps {
                 echo "=== Starting GitOps Update Stage ==="
                 echo "Current Branch (BRANCH_NAME): ${env.BRANCH_NAME}"
@@ -414,40 +410,36 @@ pipeline {
 
     post {
         success {
-            node('built-in') {
-                slackSend(
-                    color: 'good',
-                    message: ":white_check_mark: *CI Pipeline Success — ride-hail-services*\n" +
-                        "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                        "Branch: ${env.BRANCH_NAME}\n" +
-                        "Commit: `${env.GIT_SHORT}` | " +
-                        "Tag: `${env.IMAGE_TAG}`\n" +
-                        "Duration: ${currentBuild.durationString}\n\n" +
-                        "*Security Gates:*\n" +
-                        ":white_check_mark: Unit Tests (dispatch + notification)\n" +
-                        ":white_check_mark: Dependency Scan (govulncheck)\n" +
-                        ":white_check_mark: SonarQube Quality Gate\n" +
-                        ":white_check_mark: Container Image Scan (Trivy)\n\n" +
-                        "*Published:*\n" +
-                        "`${DOCKER_REGISTRY}/dispatch-service:${env.IMAGE_TAG}`\n" +
-                        "`${DOCKER_REGISTRY}/notification-service:${env.IMAGE_TAG}`"
-                )
-            }
+            slackSend(
+                color: 'good',
+                message: ":white_check_mark: *CI Pipeline Success — ride-hail-services*\n" +
+                    "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                    "Branch: ${env.BRANCH_NAME}\n" +
+                    "Commit: `${env.GIT_SHORT}` | " +
+                    "Tag: `${env.IMAGE_TAG}`\n" +
+                    "Duration: ${currentBuild.durationString}\n\n" +
+                    "*Security Gates:*\n" +
+                    ":white_check_mark: Unit Tests (dispatch + notification)\n" +
+                    ":white_check_mark: Dependency Scan (govulncheck)\n" +
+                    ":white_check_mark: SonarQube Quality Gate\n" +
+                    ":white_check_mark: Container Image Scan (Trivy)\n\n" +
+                    "*Published:*\n" +
+                    "`${DOCKER_REGISTRY}/dispatch-service:${env.IMAGE_TAG}`\n" +
+                    "`${DOCKER_REGISTRY}/notification-service:${env.IMAGE_TAG}`"
+            )
         }
 
         failure {
-            node('built-in') {
-                slackSend(
-                    color: 'danger',
-                    message: ":x: *CI Pipeline Failed — ride-hail-services*\n" +
-                        "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                        "Branch: ${env.BRANCH_NAME}\n" +
-                        "Commit: `${env.GIT_SHORT ?: 'unknown'}`\n" +
-                        "Duration: ${currentBuild.durationString}\n" +
-                        "Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}\n\n" +
-                        "><${env.BUILD_URL}console|View Console Output>"
-                )
-            }
+            slackSend(
+                color: 'danger',
+                message: ":x: *CI Pipeline Failed — ride-hail-services*\n" +
+                    "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                    "Branch: ${env.BRANCH_NAME}\n" +
+                    "Commit: `${env.GIT_SHORT ?: 'unknown'}`\n" +
+                    "Duration: ${currentBuild.durationString}\n" +
+                    "Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}\n\n" +
+                    "><${env.BUILD_URL}console|View Console Output>"
+            )
         }
     }
 }
