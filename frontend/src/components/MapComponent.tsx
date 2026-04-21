@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -15,6 +15,16 @@ interface MapComponentProps {
   className?: string;
   onClick?: (e: L.LeafletMouseEvent) => void;
 }
+
+// Helper component to handle map events
+const MapEvents = ({ onClick }: { onClick?: (e: L.LeafletMouseEvent) => void }) => {
+  useMapEvents({
+    click: (e) => {
+      if (onClick) onClick(e);
+    },
+  });
+  return null;
+};
 
 // Marker Icons setup (using standard leaflet icons but tailored)
 const customIcon = (color: string) => new L.Icon({
@@ -40,12 +50,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({ pickupStatus, dropof
 
   return (
     <div className={`map-wrapper ${className || ''}`}>
-      <MapContainer center={center} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false} onClick={onClick}>
+      <MapContainer center={center} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
         />
         
+        <MapEvents onClick={onClick} />
+
         {pickupStatus && (
           <Marker position={[pickupStatus.lat, pickupStatus.lng]} icon={pickupIcon}>
             <Popup>Pickup Location</Popup>
