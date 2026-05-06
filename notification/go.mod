@@ -1,6 +1,6 @@
 module gitlab.com/ride-hailing-devsecops/services/notification-service
 
-go 1.25.6
+go 1.25.9
 
 require github.com/prometheus/client_golang v1.23.2
 
