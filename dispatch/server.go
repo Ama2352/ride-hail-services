@@ -34,7 +34,7 @@ func setupRouter(config Config) *http.ServeMux {
 	// Health check endpoint handler (shared by legacy + namespaced routes)
 	healthHandler := func(w http.ResponseWriter, r *http.Request) {
 		response := HealthResponse{
-			Status:    "healthy_service",
+			Status:    "healthy_service2",
 			Service:   config.ServiceName,
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		}
