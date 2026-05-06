@@ -57,18 +57,16 @@ pipeline {
                         }
                     }
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            dir('dispatch') {
-                                sh '''
-                                    echo "=== [dispatch] Downloading Go modules ==="
-                                    go mod download
-                                    echo "=== [dispatch] Running go vet ==="
-                                    go vet ./... || true
-                                    echo "=== [dispatch] Running unit tests ==="
-                                    go test -v -coverprofile=coverage.out ./... || echo "Tests failed or not found"
-                                    echo "=== [dispatch] Tests complete ==="
-                                '''
-                            }
+                        dir('dispatch') {
+                            sh '''
+                                echo "=== [dispatch] Downloading Go modules ==="
+                                go mod download
+                                echo "=== [dispatch] Running go vet ==="
+                                go vet ./...
+                                echo "=== [dispatch] Running unit tests ==="
+                                go test -v -coverprofile=coverage.out ./...
+                                echo "=== [dispatch] Tests complete ==="
+                            '''
                         }
                     }
                     post {
@@ -95,18 +93,16 @@ pipeline {
                         }
                     }
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            dir('notification') {
-                                sh '''
-                                    echo "=== [notification] Downloading Go modules ==="
-                                    go mod download
-                                    echo "=== [notification] Running go vet ==="
-                                    go vet ./... || true
-                                    echo "=== [notification] Running unit tests ==="
-                                    go test -v -coverprofile=coverage.out ./... || echo "Tests failed or not found"
-                                    echo "=== [notification] Tests complete ==="
-                                '''
-                            }
+                        dir('notification') {
+                            sh '''
+                                echo "=== [notification] Downloading Go modules ==="
+                                go mod download
+                                echo "=== [notification] Running go vet ==="
+                                go vet ./...
+                                echo "=== [notification] Running unit tests ==="
+                                go test -v -coverprofile=coverage.out ./...
+                                echo "=== [notification] Tests complete ==="
+                            '''
                         }
                     }
                     post {
@@ -133,23 +129,16 @@ pipeline {
                         }
                     }
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            // -------------------------------------------------------
-                            // TEST HOOK: Uncomment the line below to force a failure
-                            // and verify Slack failure notifications. Revert before merge.
-                            // -------------------------------------------------------
-                            // error('TEST: Deliberate failure — verify Slack notification')
-                            sh '''
-                                echo "=== Installing govulncheck ==="
-                                go install golang.org/x/vuln/cmd/govulncheck@latest
-                                GOVULNCHECK=$(go env GOPATH)/bin/govulncheck
-                                echo "=== [dispatch] Scanning for known vulnerabilities ==="
-                                cd dispatch && $GOVULNCHECK ./... || true
-                                echo "=== [notification] Scanning for known vulnerabilities ==="
-                                cd ../notification && $GOVULNCHECK ./... || true
-                                echo "=== Dependency scan complete ==="
-                            '''
-                        }
+                        sh '''
+                            echo "=== Installing govulncheck ==="
+                            go install golang.org/x/vuln/cmd/govulncheck@latest
+                            GOVULNCHECK=$(go env GOPATH)/bin/govulncheck
+                            echo "=== [dispatch] Scanning for known vulnerabilities ==="
+                            cd dispatch && $GOVULNCHECK ./...
+                            echo "=== [notification] Scanning for known vulnerabilities ==="
+                            cd ../notification && $GOVULNCHECK ./...
+                            echo "=== Dependency scan complete ==="
+                        '''
                     }
                     post {
                         failure {
@@ -169,51 +158,51 @@ pipeline {
             }
         }
 
-        // stage('SonarQube Analysis') {
-        //     agent {
-        //         docker {
-        //             image 'sonarsource/sonar-scanner-cli:11.3'
-        //             args  '-u root -e HOME=/root -v /tmp/sonar-cache:/root/.sonar/cache'
-        //             reuseNode true
-        //         }
-        //     }
-        //     steps {
-        //         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-        //             withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-        //                 // -------------------------------------------------------
-        //                 // TEST HOOK: Uncomment to force a SonarQube failure.
-        //                 // Revert before merge.
-        //                 // -------------------------------------------------------
-        //                 // error('TEST: Deliberate SonarQube failure — verify Slack notification')
-        //                 sh '''
-        //                     echo "=== [dispatch] Running SonarQube analysis ==="
-        //                     cd dispatch
-        //                     sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
-        //                     echo "=== [dispatch] SonarQube analysis submitted ==="
+        stage('SonarQube Analysis') {
+            agent {
+                docker {
+                    image 'sonarsource/sonar-scanner-cli:11.3'
+                    args  '-u root -e HOME=/root -v /tmp/sonar-cache:/root/.sonar/cache'
+                    reuseNode true
+                }
+            }
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                        // -------------------------------------------------------
+                        // TEST HOOK: Uncomment to force a SonarQube failure.
+                        // Revert before merge.
+                        // -------------------------------------------------------
+                        // error('TEST: Deliberate SonarQube failure — verify Slack notification')
+                        sh '''
+                            echo "=== [dispatch] Running SonarQube analysis ==="
+                            cd dispatch
+                            sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
+                            echo "=== [dispatch] SonarQube analysis submitted ==="
 
-        //                     echo "=== [notification] Running SonarQube analysis ==="
-        //                     cd ../notification
-        //                     sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
-        //                     echo "=== [notification] SonarQube analysis submitted ==="
-        //                 '''
-        //             }
-        //         }
-        //     }
-        //     post {
-        //         failure {
-        //             slackSend(
-        //                 color: 'danger',
-        //                 message: ":warning: *SonarQube Quality Gate Failed*\n" +
-        //                     "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-        //                     "Branch: ${env.BRANCH_NAME}\n" +
-        //                     "Commit: `${env.GIT_SHORT}`\n" +
-        //                     ">Static analysis did not pass the quality gate.\n" +
-        //                     ">SonarQube: ${SONAR_HOST}\n" +
-        //                     "><${env.BUILD_URL}console|View Console Output>"
-        //             )
-        //         }
-        //     }
-        // }
+                            echo "=== [notification] Running SonarQube analysis ==="
+                            cd ../notification
+                            sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
+                            echo "=== [notification] SonarQube analysis submitted ==="
+                        '''
+                    }
+                }
+            }
+            post {
+                failure {
+                    slackSend(
+                        color: 'danger',
+                        message: ":warning: *SonarQube Quality Gate Failed*\n" +
+                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+                            "Branch: ${env.BRANCH_NAME}\n" +
+                            "Commit: `${env.GIT_SHORT}`\n" +
+                            ">Static analysis did not pass the quality gate.\n" +
+                            ">SonarQube: ${SONAR_HOST}\n" +
+                            "><${env.BUILD_URL}console|View Console Output>"
+                    )
+                }
+            }
+        }
 
         stage('Build Images') {
             agent {
@@ -249,27 +238,18 @@ pipeline {
                 }
             }
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    // -------------------------------------------------------
-                    // TEST HOOK: Uncomment to force a Trivy CVE gate failure.
-                    // Revert before merge.
-                    // -------------------------------------------------------
-                    // error('TEST: Deliberate Trivy failure — verify Slack notification')
-                    sh '''
-                        set -e
-                        echo "=== [dispatch] Scanning for HIGH/CRITICAL CVEs ==="
-                        trivy image --input dispatch-service.tar \
-                            --severity HIGH,CRITICAL --exit-code 1 --format table \
-                            || echo "Vulnerabilities found in dispatch-service"
-                        
-                        echo "=== [notification] Scanning for HIGH/CRITICAL CVEs ==="
-                        trivy image --input notification-service.tar \
-                            --severity HIGH,CRITICAL --exit-code 1 --format table \
-                            || echo "Vulnerabilities found in notification-service"
+                sh '''
+                    set -e
+                    echo "=== [dispatch] Scanning for HIGH/CRITICAL CVEs ==="
+                    trivy image --input dispatch-service.tar \
+                        --severity HIGH,CRITICAL --exit-code 1 --format table
 
-                        echo "=== Security scan complete (results recorded above) ==="
-                    '''
-                }
+                    echo "=== [notification] Scanning for HIGH/CRITICAL CVEs ==="
+                    trivy image --input notification-service.tar \
+                        --severity HIGH,CRITICAL --exit-code 1 --format table
+
+                    echo "=== Security scan complete (results recorded above) ==="
+                '''
             }
             post {
                 failure {
