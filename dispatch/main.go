@@ -12,8 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -23,15 +21,7 @@ func main() {
 		Version:     getEnv("VERSION", "1.0.0"),
 	}
 
-	// Initialize Redis client
-	rdb := redis.NewClient(&redis.Options{
-		Addr: resolveMainRedisAddr(),
-	})
-
-	mux := setupRouter(config, rdb)
-
-	// Wrap mux with metrics middleware
-	handler := metricsMiddleware(mux)
+	mux := setupRouter(config)
 
 	// Handle graceful shutdown
 	go func() {
@@ -40,22 +30,11 @@ func main() {
 		<-sigch
 
 		log.Printf("Shutting down %s...", config.ServiceName)
-		if cancel != nil {
-			cancel()
-		}
-		rdb.Close()
 		os.Exit(0)
 	}()
 
 	log.Printf("Starting %s on port %s", config.ServiceName, config.Port)
-	if err := http.ListenAndServe(":"+config.Port, handler); err != nil {
+	if err := http.ListenAndServe(":"+config.Port, mux); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
-}
-
-func resolveMainRedisAddr() string {
-	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
-		return addr
-	}
-	return getEnv("REDIS_URL", "localhost:6379")
 }

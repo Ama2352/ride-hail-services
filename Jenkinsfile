@@ -195,16 +195,6 @@ pipeline {
                             cd ../notification
                             sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
                             echo "=== [notification] SonarQube analysis submitted ==="
-
-                            echo "=== [user] Running SonarQube analysis ==="
-                            cd ../user
-                            sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
-                            echo "=== [user] SonarQube analysis submitted ==="
-
-                            echo "=== [ride] Running SonarQube analysis ==="
-                            cd ../ride
-                            sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
-                            echo "=== [ride] SonarQube analysis submitted ==="
                         '''
                     }
                 }
@@ -244,21 +234,12 @@ pipeline {
                     docker build -t notification-service:${IMAGE_TAG} notification
                     docker save  notification-service:${IMAGE_TAG} -o notification-service.tar
 
-                    echo "=== [user] Building Docker image: user-service:${IMAGE_TAG} ==="
-                    docker build -t user-service:${IMAGE_TAG} user
-                    docker save  user-service:${IMAGE_TAG} -o user-service.tar
-
-                    echo "=== [ride] Building Docker image: ride-service:${IMAGE_TAG} ==="
-                    docker build -t ride-service:${IMAGE_TAG} ride
-                    docker save  ride-service:${IMAGE_TAG} -o ride-service.tar
-
                     echo "=== Image tars ready for security scan ==="
                     ls -lh *.tar
                 '''
             }
         }
 
-/*
         stage('Scan Images') {
             agent {
                 docker {
@@ -286,16 +267,6 @@ pipeline {
                             --severity HIGH,CRITICAL --exit-code 1 --format table \
                             || echo "Vulnerabilities found in notification-service"
 
-                        echo "=== [user] Scanning for HIGH/CRITICAL CVEs ==="
-                        trivy image --input user-service.tar \
-                            --severity HIGH,CRITICAL --exit-code 1 --format table \
-                            || echo "Vulnerabilities found in user-service"
-
-                        echo "=== [ride] Scanning for HIGH/CRITICAL CVEs ==="
-                        trivy image --input ride-service.tar \
-                            --severity HIGH,CRITICAL --exit-code 1 --format table \
-                            || echo "Vulnerabilities found in ride-service"
-
                         echo "=== Security scan complete (results recorded above) ==="
                     '''
                 }
@@ -315,7 +286,6 @@ pipeline {
                 }
             }
         }
-*/
 
         stage('Push Images') {
             agent {
@@ -352,16 +322,6 @@ pipeline {
                         docker tag notification-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
                         docker push ${DOCKER_REGISTRY}/notification-service:${IMAGE_TAG}
 
-                        echo "=== [user] Tagging and pushing ==="
-                        docker load -i user-service.tar
-                        docker tag user-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-
-                        echo "=== [ride] Tagging and pushing ==="
-                        docker load -i ride-service.tar
-                        docker tag ride-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/ride-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/ride-service:${IMAGE_TAG}
-
                         echo "=== All images pushed successfully ==="
                     '''
                 }
@@ -392,8 +352,6 @@ pipeline {
                         # Update all service overlays
                         sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/dispatch/overlays/dev/kustomization.yaml
                         sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/notification/overlays/dev/kustomization.yaml
-                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/user/overlays/dev/kustomization.yaml
-                        sed -i "s|newTag:.*|newTag: \"${IMAGE_TAG}\"|" apps/ride/overlays/dev/kustomization.yaml
 
                         echo "=== Committing and pushing to GitOps repo ==="
                         git config user.email "jenkins@ride-hail.ci"
