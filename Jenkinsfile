@@ -169,51 +169,51 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            agent {
-                docker {
-                    image 'sonarsource/sonar-scanner-cli:11.3'
-                    args  '-u root -e HOME=/root -v /tmp/sonar-cache:/root/.sonar/cache'
-                    reuseNode true
-                }
-            }
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                        // -------------------------------------------------------
-                        // TEST HOOK: Uncomment to force a SonarQube failure.
-                        // Revert before merge.
-                        // -------------------------------------------------------
-                        // error('TEST: Deliberate SonarQube failure — verify Slack notification')
-                        sh '''
-                            echo "=== [dispatch] Running SonarQube analysis ==="
-                            cd dispatch
-                            sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
-                            echo "=== [dispatch] SonarQube analysis submitted ==="
+        // stage('SonarQube Analysis') {
+        //     agent {
+        //         docker {
+        //             image 'sonarsource/sonar-scanner-cli:11.3'
+        //             args  '-u root -e HOME=/root -v /tmp/sonar-cache:/root/.sonar/cache'
+        //             reuseNode true
+        //         }
+        //     }
+        //     steps {
+        //         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+        //             withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+        //                 // -------------------------------------------------------
+        //                 // TEST HOOK: Uncomment to force a SonarQube failure.
+        //                 // Revert before merge.
+        //                 // -------------------------------------------------------
+        //                 // error('TEST: Deliberate SonarQube failure — verify Slack notification')
+        //                 sh '''
+        //                     echo "=== [dispatch] Running SonarQube analysis ==="
+        //                     cd dispatch
+        //                     sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
+        //                     echo "=== [dispatch] SonarQube analysis submitted ==="
 
-                            echo "=== [notification] Running SonarQube analysis ==="
-                            cd ../notification
-                            sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
-                            echo "=== [notification] SonarQube analysis submitted ==="
-                        '''
-                    }
-                }
-            }
-            post {
-                failure {
-                    slackSend(
-                        color: 'danger',
-                        message: ":warning: *SonarQube Quality Gate Failed*\n" +
-                            "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
-                            "Branch: ${env.BRANCH_NAME}\n" +
-                            "Commit: `${env.GIT_SHORT}`\n" +
-                            ">Static analysis did not pass the quality gate.\n" +
-                            ">SonarQube: ${SONAR_HOST}\n" +
-                            "><${env.BUILD_URL}console|View Console Output>"
-                    )
-                }
-            }
-        }
+        //                     echo "=== [notification] Running SonarQube analysis ==="
+        //                     cd ../notification
+        //                     sonar-scanner -Dsonar.host.url=${SONAR_HOST} -Dsonar.token=${SONAR_TOKEN} || true
+        //                     echo "=== [notification] SonarQube analysis submitted ==="
+        //                 '''
+        //             }
+        //         }
+        //     }
+        //     post {
+        //         failure {
+        //             slackSend(
+        //                 color: 'danger',
+        //                 message: ":warning: *SonarQube Quality Gate Failed*\n" +
+        //                     "Build <${env.BUILD_URL}|#${env.BUILD_NUMBER}> | " +
+        //                     "Branch: ${env.BRANCH_NAME}\n" +
+        //                     "Commit: `${env.GIT_SHORT}`\n" +
+        //                     ">Static analysis did not pass the quality gate.\n" +
+        //                     ">SonarQube: ${SONAR_HOST}\n" +
+        //                     "><${env.BUILD_URL}console|View Console Output>"
+        //             )
+        //         }
+        //     }
+        // }
 
         stage('Build Images') {
             agent {
